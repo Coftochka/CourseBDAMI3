@@ -1,6 +1,7 @@
-% Библиография для плана курсовой работы
+% Библиография для курсовой работы
+% Статьи по моделям — преимущественно arXiv
 
-% ========== Классические методы ==========
+% ========== Оптимизация портфеля ==========
 
 @article{markowitz1952portfolio,
   author  = {Markowitz, Harry},
@@ -22,113 +23,133 @@
   pages   = {365--411}
 }
 
-@book{hull2018options,
-  author    = {Hull, John C.},
-  title     = {Options, Futures, and Other Derivatives},
-  publisher = {Pearson},
-  year      = {2018},
-  edition   = {10th}
+% ========== Рекуррентные сети (RNN, LSTM, GRU) ==========
+
+@article{elman1990rnn,
+  author  = {Elman, Jeffrey L.},
+  title   = {Finding Structure in Time},
+  journal = {Cognitive Science},
+  year    = {1990},
+  volume  = {14},
+  number  = {2},
+  pages   = {179--211},
+  doi     = {10.1207/s15516709cog1402_1}
 }
 
-% ========== Машинное обучение с подкреплением ==========
-
-@article{sutton2018rl,
-  author    = {Sutton, Richard S. and Barto, Andrew G.},
-  title     = {Reinforcement Learning: An Introduction},
-  publisher = {MIT Press},
-  year      = {2018},
-  edition   = {2nd}
+@article{greff2015lstm,
+  author        = {Greff, Klaus and Srivastava, Rupesh K. and Koutn{\'i}k, Jan and Steunebrink, Bas R. and Schmidhuber, J{\"u}rgen},
+  title         = {{LSTM}: A Search Space Odyssey},
+  journal       = {IEEE Transactions on Neural Networks and Learning Systems},
+  year          = {2017},
+  volume        = {28},
+  number        = {10},
+  pages         = {2222--2232},
+  note          = {arXiv:1503.04069},
+  eprint        = {1503.04069},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.LG}
 }
 
-@article{mnih2015dqn,
-  author  = {Mnih, Volodymyr and Kavukcuoglu, Koray and Silver, David and others},
-  title   = {Human-level control through deep reinforcement learning},
-  journal = {Nature},
-  year    = {2015},
-  volume  = {518},
-  number  = {7540},
-  pages   = {529--533}
+@article{cho2014gru,
+  author        = {Cho, Kyunghyun and van Merri{\"e}nboer, Bart and G{\"u}l{\c{c}}ehre, {\c{C}}aglar and Bougares, Fethi and Schwenk, Holger and Bengio, Yoshua},
+  title         = {Learning Phrase Representations using {RNN} Encoder-Decoder for Statistical Machine Translation},
+  journal       = {arXiv preprint},
+  year          = {2014},
+  eprint        = {1406.1078},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CL}
 }
 
-@misc{schulman2017ppo,
-  author = {Schulman, John and Wolski, Filip and Dhariwal, Prafulla and Radford, Alec and Klimov, Oleg},
-  title  = {Proximal Policy Optimization Algorithms},
-  year   = {2017},
-  note   = {arXiv preprint arXiv:1707.06347}
+@article{lstm2022financial,
+  author        = {},
+  title         = {Long Short-Term Memory Neural Network for Financial Time Series},
+  journal       = {arXiv preprint},
+  year          = {2022},
+  eprint        = {2201.08218},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.LG}
 }
 
-% ========== RL в финансах ==========
-
-@article{moody2001learning,
-  author  = {Moody, John and Saffell, Matthew},
-  title   = {Learning to trade via direct reinforcement},
-  journal = {IEEE Transactions on Neural Networks},
-  year    = {2001},
-  volume  = {12},
-  number  = {4},
-  pages   = {875--889}
+@article{liu2019dstp,
+  author  = {Liu, Yeqi and Gong, Chuanyang and Yang, Ling and Chen, Yingyi},
+  title   = {{DSTP-RNN}: a dual-stage two-phase attention-based recurrent neural networks for long-term and multivariate time series prediction},
+  journal = {},
+  year    = {2019},
+  note    = {}
 }
 
-@article{deng2017deep,
-  author  = {Deng, Yue and Bao, Feng and Kong, Youyong and Ren, Zhiquan and Dai, Qionghai},
-  title   = {Deep direct reinforcement learning for financial signal representation and trading},
-  journal = {IEEE Transactions on Neural Networks and Learning Systems},
-  year    = {2017},
-  volume  = {28},
-  number  = {3},
-  pages   = {653--664}
+@article{siami2019comparative,
+  author  = {Siami-Namini, Sima and Tavakoli, Neda and Siami Namin, Akbar},
+  title   = {A Comparative Analysis of Forecasting Financial Time Series Using {ARIMA}, {LSTM}, and {BiLSTM}},
+  journal = {},
+  year    = {2019},
+  note    = {arXiv preprint}
 }
 
-@misc{jiang2017deep,
-  author = {Jiang, Zhengyao and Xu, Dixing and Liang, Jinjun},
-  title  = {A deep reinforcement learning framework for the financial portfolio management problem},
-  year   = {2017},
-  note   = {arXiv preprint arXiv:1706.10059}
+@article{changepoint2024,
+  author  = {},
+  title   = {An Evaluation of Change Point Detection Algorithms},
+  journal = {},
+  year    = {2024},
+  note    = {}
 }
 
-@inproceedings{liu2020finrl,
-  author    = {Liu, Xiao-Yang and Yang, Hongyang and Chen, Qian and others},
-  title     = {FinRL: A deep reinforcement learning library for automated stock trading},
-  booktitle = {ACM International Conference on AI in Finance},
-  year      = {2020},
-  pages     = {1--9}
+@article{cnntransformer2024,
+  author  = {},
+  title   = {Financial Time Series Forecasting using {CNN} and {Transformer}},
+  journal = {},
+  year    = {2024},
+  note    = {}
 }
 
-@misc{yang2020deep,
-  author = {Yang, Hongyang and Liu, Xiao-Yang and Zhong, Shan and Walid, Anwar},
-  title  = {Deep reinforcement learning for automated stock trading: An ensemble strategy},
-  year   = {2020},
-  note   = {SSRN Electronic Journal}
+@article{garchgru2024,
+  author  = {},
+  title   = {Integrated {GARCH}-{GRU} in Financial Volatility Forecasting},
+  journal = {},
+  year    = {2024},
+  note    = {}
 }
 
-% ========== NLP ==========
+% ========== CNN и гибриды для временных рядов ==========
 
-@inproceedings{devlin2019bert,
-  author    = {Devlin, Jacob and Chang, Ming-Wei and Lee, Kenton and Toutanova, Kristina},
-  title     = {BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding},
-  booktitle = {Proceedings of NAACL-HLT},
-  year      = {2019},
-  pages     = {4171--4186}
+@article{lai2018lstnet,
+  author        = {Lai, Guokun and Chang, Wei-Cheng and Yang, Yiming and Liu, Hanxiao},
+  title         = {Modeling Long- and Short-Term Temporal Patterns with Deep Neural Networks},
+  journal       = {arXiv preprint},
+  year          = {2017},
+  eprint        = {1703.07015},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.LG},
+  note          = {Published: Proc. ACM SIGIR, 2018}
 }
 
-@article{bollen2011twitter,
-  author  = {Bollen, Johan and Mao, Huina and Zeng, Xiaojun},
-  title   = {Twitter mood predicts the stock market},
-  journal = {Journal of Computational Science},
-  year    = {2011},
-  volume  = {2},
-  number  = {1},
-  pages   = {1--8}
+% ========== Transformer ==========
+
+@article{vaswani2017attention,
+  author        = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, {\L}ukasz and Polosukhin, Illia},
+  title         = {Attention Is All You Need},
+  journal       = {arXiv preprint},
+  year          = {2017},
+  eprint        = {1706.03762},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CL},
+  note          = {Advances in Neural Information Processing Systems 30 (NeurIPS 2017)}
 }
 
-@misc{araci2019finbert,
-  author = {Araci, Dogu},
-  title  = {FinBERT: Financial Sentiment Analysis with Pre-trained Language Models},
-  year   = {2019},
-  note   = {arXiv preprint arXiv:1908.10063}
+% ========== Обнаружение точек смены режима ==========
+
+@article{truong2020changepoint,
+  author        = {Truong, Charles and Oudre, Laurent and Vayatis, Nicolas},
+  title         = {Selective review of offline change point detection methods},
+  journal       = {arXiv preprint},
+  year          = {2018},
+  eprint        = {1801.00718},
+  archiveprefix = {arXiv},
+  primaryclass  = {stat.ME},
+  note          = {Signal Processing, 2020, vol. 167}
 }
 
-% ========== Метрики ==========
+% ========== Метрики и бэктестирование ==========
 
 @article{sharpe1994sharpe,
   author  = {Sharpe, William F.},
@@ -150,7 +171,7 @@
 }
 
 @article{bailey2014deflated,
-  author  = {Bailey, David H. and López de Prado, Marcos},
+  author  = {Bailey, David H. and L{\'o}pez de Prado, Marcos},
   title   = {The Deflated Sharpe Ratio: Correcting for Selection Bias},
   journal = {The Journal of Portfolio Management},
   year    = {2014},
@@ -178,27 +199,3 @@
   number  = {4},
   pages   = {560--590}
 }
-
-% ========== Технологии ==========
-
-@misc{openai_gym,
-  author = {Brockman, Greg and Cheung, Vicki and Pettersson, Ludwig and others},
-  title  = {OpenAI Gym},
-  year   = {2016},
-  note   = {arXiv preprint arXiv:1606.01540}
-}
-
-@misc{stable_baselines3,
-  author = {Raffin, Antonin and Hill, Ashley and Gleave, Adam and others},
-  title  = {Stable-Baselines3: Reliable Reinforcement Learning Implementations},
-  year   = {2021},
-  note   = {Journal of Machine Learning Research, 22(268), 1-8}
-}
-
-@misc{pytorch,
-  author = {Paszke, Adam and Gross, Sam and Massa, Francisco and others},
-  title  = {PyTorch: An Imperative Style, High-Performance Deep Learning Library},
-  year   = {2019},
-  note   = {NeurIPS 2019}
-}
-
