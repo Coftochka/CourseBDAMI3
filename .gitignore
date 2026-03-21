@@ -2,3 +2,8 @@
 *pycache*
 *.csv
 *venv*
+
+!*SUPER_FULL.csv
+!*BASIC_FULL.csv
+!*HEAD?.csv
+!*HEAD??.csv
