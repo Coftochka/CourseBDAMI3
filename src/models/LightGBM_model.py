@@ -1,5 +1,6 @@
-from model_base import BaseModel
+from Base_model import BaseModel
 import numpy as np
+import lightgbm as lgb
 import matplotlib.pyplot as plt
 import json
 import os
@@ -75,11 +76,6 @@ class LightGBMModel(BaseModel):
             optimizer, scheduler, batch_size are accepted for interface parity
             with neural models but have no effect on LightGBM training.
         """
-        try:
-            import lightgbm as lgb
-        except ImportError as e:
-            raise ImportError("lightgbm is not installed. Run: pip install lightgbm") from e
-
         if epochs is not None:
             self.n_estimators = epochs
 
@@ -150,7 +146,6 @@ class LightGBMModel(BaseModel):
         if self._model is None:
             raise RuntimeError("fit model before plotting importance")
 
-        import lightgbm as lgb
         lgb.plot_importance(
             self._model,
             importance_type="gain",
@@ -250,11 +245,6 @@ class LightGBMModel(BaseModel):
 
     @classmethod
     def load(cls, path: str) -> "LightGBMModel":
-        try:
-            import lightgbm as lgb
-        except ImportError as e:
-            raise ImportError("lightgbm is not installed. Run: pip install lightgbm") from e
-
         with open(path + ".json") as f:
             meta = json.load(f)
 
