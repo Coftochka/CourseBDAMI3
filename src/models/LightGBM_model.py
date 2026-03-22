@@ -1,8 +1,9 @@
-from Base_model import BaseModel
+from Base_model import BaseModel, classification_metrics_df
 import numpy as np
 import lightgbm as lgb
 import matplotlib.pyplot as plt
 import json
+import pandas as pd
 
 
 class LightGBMModel(BaseModel):
@@ -194,24 +195,19 @@ class LightGBMModel(BaseModel):
         proba = self._model.predict_proba(self._to_df(window))[0, 1]
         return float(proba), proba >= threshold
 
-    def score(self, X, y) -> dict:
+    def scores(self, X, y, model_name: str, threshold: float = 0.5) -> pd.DataFrame:
         """
         input:
             X : ndarray (n_timesteps, n_features)
             y : ndarray (n_timesteps,)
+            model_name: label for the metrics row
+            threshold: decision threshold for binary classification
         output:
-            dict with accuracy, f1, roc_auc
+            pd.DataFrame  shape (1, n_metrics), index=[model_name]
         """
-        from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-
         X_w, y_w = self._make_windows(X, y)
         proba = self._model.predict_proba(self._to_df(X_w))[:, 1].astype(np.float32)
-        pred  = (proba >= 0.5).astype(int)
-        return {
-            "accuracy": accuracy_score(y_w, pred),
-            "f1":       f1_score(y_w, pred),
-            "roc_auc":  roc_auc_score(y_w, proba),
-        }
+        return classification_metrics_df(y_w, proba, model_name, threshold=threshold)
 
     def save(self, path: str):
         """
