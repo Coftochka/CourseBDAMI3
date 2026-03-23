@@ -1,8 +1,9 @@
-from Base_model import BaseModel
+from Base_model import BaseModel, classification_metrics_df
 from torch import nn
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 class CNNModel(BaseModel, nn.Module):
@@ -188,26 +189,19 @@ class CNNModel(BaseModel, nn.Module):
 
         return proba, proba >= threshold
 
-    def score(self, X, y) -> dict:
+    def scores(self, X, y, model_name: str, threshold: float = 0.5) -> pd.DataFrame:
         """
         input:
             X: ndarray (n_timesteps, n_features)
             y: ndarray (n_timesteps,)
+            model_name: label for the metrics row
+            threshold: decision threshold for binary classification
         output:
-            accuracy: float
-            f1: float
-            roc_auc: float
+            pd.DataFrame  shape (1, n_metrics), index=[model_name]
         """
-        from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-
         _, y_w = self._make_windows(X, y)
-        pred  = self.predict(X)
         proba = self.predict_proba(X)
-        return {
-            "accuracy": accuracy_score(y_w, pred),
-            "f1":       f1_score(y_w, pred),
-            "roc_auc":  roc_auc_score(y_w, proba),
-        }
+        return classification_metrics_df(y_w, proba, model_name, threshold=threshold)
 
 
     def save(self, path: str):
