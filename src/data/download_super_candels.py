@@ -47,7 +47,7 @@ def DataTransform(data_ob, data_tr, data_or):
 
     data = pd.merge(data_ob, data_tr, on=("tradedate", "tradetime", "ticker"), how="inner")
     data = pd.merge(data,    data_ob, on=("tradedate", "tradetime", "ticker"), how="inner")
-
+    
     return data
 
 def LoadSuperCandels(ticker : Ticker, dateBegin : str, dateEnd : str) -> pd.DataFrame:
