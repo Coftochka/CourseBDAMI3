@@ -98,7 +98,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 2: 
         print("missing ticker argument"); 
     print ("VALUES:", sys.argv[0], sys.argv[1])
-    LoadTicker(sys.argv[1], dataBegin, dataEnd)import os 
+    LoadTicker(sys.argv[1], dataBegin, dataEnd)
+"""  """import os 
 import pandas as pd 
 import sys 
 

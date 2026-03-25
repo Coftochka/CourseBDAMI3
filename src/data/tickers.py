@@ -1,3 +1,5 @@
+from random import * 
+
 TICKERS = """ABIO
 ABRD
 AFKS
@@ -260,3 +262,27 @@ ASTR
 AVAN""".split("\n")
 TICKERS = sorted(list(set(TICKERS)))
 print(len(TICKERS))
+
+data = TICKERS[:]
+
+seed(42)
+shuffle(data)
+
+
+
+a = data[0:30]
+b = data[30:60]
+c = data[60:90]
+
+with open("tickers_and.txt", 'w') as file:
+    txt = "\n".join(a)
+    file.write(txt)
+
+with open("tickers_bor.txt", 'w') as file:
+    txt = "\n".join(b)
+    file.write(txt)
+
+with open("tickers_dem.txt", 'w') as file:
+    txt = "\n".join(c)
+    file.write(txt)
+
