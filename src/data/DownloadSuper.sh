@@ -22,7 +22,7 @@ cur_dir=$(dirname "$(readlink -f "$0")")
 cd "$cur_dir"
 
 
-tickers_file="${1:-tickers_bor.txt}"
+tickers_file="${1:-tickers.txt}"
 
 if [ ! -f "$tickers_file" ]; then
     echo "Файл с тикерами $tickers_file не найден!"
