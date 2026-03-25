@@ -88,7 +88,8 @@ def LoadTicker(tickerSymb, dateBegin, dateEnd) -> list[pd.DataFrame]:
     else:
         begin = dateBegin
 
-    while (begin <= dateEnd): 
+    begin0 = ""
+    while (begin <= dateEnd) and (begin0 != begin): 
         begin0 = begin
 
         data = LoadSuperCandels(ticker, begin, "today")        
