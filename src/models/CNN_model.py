@@ -34,6 +34,7 @@ class CNNModel(TorchBaseModel):
         mode: str = "single",
         num_tickers: int = 1,
         embedding_dim: int = 8,
+        device: Optional[str] = None,
     ):
         """
         input_size    : number of features
@@ -45,6 +46,7 @@ class CNNModel(TorchBaseModel):
         mode          : "single" | "pooled" | "finetune"
         num_tickers   : number of assets (ignored for mode="single")
         embedding_dim : dimension of the asset embedding
+        device        : "cuda" / "mps" / "cpu" (auto-detected if None)
         """
         assert mode in ("single", "pooled", "finetune"), (
             f"mode is {mode}, should be 'single', 'pooled' or 'finetune'"
@@ -82,6 +84,7 @@ class CNNModel(TorchBaseModel):
             self.fc = nn.Linear(num_filters + embedding_dim, 1)
 
         self.history: Dict[str, List[float]] = {"train_loss": [], "val_loss": []}
+        self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor, ticker_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -96,6 +99,7 @@ class CNNModel(TorchBaseModel):
             return self.fc(cnn_out).squeeze(-1)
 
         assert ticker_ids is not None, "ticker_ids is required for pooled and finetune modes"
+        assert self.ticker_embedding is not None
         emb = self.ticker_embedding(ticker_ids)
         return self.fc(torch.cat([cnn_out, emb], dim=1)).squeeze(-1)
 
@@ -131,6 +135,7 @@ class CNNModel(TorchBaseModel):
         ids_val = np.full(len(X_val), ticker_id, dtype=np.int64) if X_val is not None else None
 
         if freeze_conv:
+            assert self.ticker_embedding is not None
             trainable = list(self.fc.parameters()) + list(self.ticker_embedding.parameters())
             optimizer = optimizer or torch.optim.Adam(trainable, lr=1e-4)
         else:
@@ -149,7 +154,7 @@ class CNNModel(TorchBaseModel):
 
     def save(self, path: str):
         torch.save({
-            "state_dict": self.state_dict(),
+            "state_dict": {k: v.cpu() for k, v in self.state_dict().items()},
             "config": {
                 "input_size":    self.input_size,
                 "num_filters":   self.num_filters,
@@ -164,10 +169,11 @@ class CNNModel(TorchBaseModel):
         }, path)
 
     @classmethod
-    def load(cls, path: str) -> "CNNModel":
-        ckpt = torch.load(path, weights_only=True)
+    def load(cls, path: str, device: Optional[str] = None) -> "CNNModel":
+        ckpt = torch.load(path, weights_only=True, map_location="cpu")
         cfg = dict(ckpt["config"])
         cfg.pop("horizon", None)
+        cfg["device"] = device
         model = cls(**cfg)
         model.load_state_dict(ckpt["state_dict"])
         return model

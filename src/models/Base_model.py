@@ -23,9 +23,6 @@ class BaseModel(ABC):
     @abstractmethod
     def save(self, path: str): ...
 
-    @abstractmethod
-    def load(self, path: str): ...
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Shared base for all Torch sequence models (LSTM, GRU, CNN, Transformer)
@@ -39,7 +36,20 @@ class TorchBaseModel(BaseModel, nn.Module):
         self.seq_len  : int
         self.mode     : "single" | "pooled" | "finetune"
         forward(x, ticker_ids) -> Tensor
+
+    Device is resolved automatically: CUDA > MPS > CPU.
+    Pass device= explicitly to override.
     """
+
+    @staticmethod
+    def _resolve_device(device: Optional[str] = None) -> torch.device:
+        if device is not None:
+            return torch.device(device)
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        if torch.backends.mps.is_available():
+            return torch.device("mps")
+        return torch.device("cpu")
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -87,15 +97,16 @@ class TorchBaseModel(BaseModel, nn.Module):
 
     def _run_epoch(self, loader, optimizer, criterion, training: bool):
         self.train(training)
+        device = next(self.parameters()).device
         total_loss = 0.0
         n = 0
         ctx = torch.enable_grad() if training else torch.no_grad()
         with ctx:
             for batch in loader:
                 if len(batch) == 3:
-                    X_b, y_b, ids_b = batch
+                    X_b, y_b, ids_b = [t.to(device) for t in batch]
                 else:
-                    X_b, y_b = batch
+                    X_b, y_b = [t.to(device) for t in batch]
                     ids_b = None
 
                 if training:
@@ -148,23 +159,23 @@ class TorchBaseModel(BaseModel, nn.Module):
         X_w, y_w, ids_w = self._make_windows(X, y, ticker_ids)
         has_val = X_val is not None and y_val is not None
 
+        val_loader = None
         if has_val:
             X_val_w, y_val_w, ids_val_w = self._make_windows(X_val, y_val, ticker_ids_val)
+            val_loader, _ = self._build_loader(X_val_w, y_val_w, ids_val_w, batch_size, shuffle=False)
 
         optimizer = optimizer or torch.optim.Adam(self.parameters(), lr=1e-3)
         criterion = nn.MSELoss()
         self.history = {"train_loss": [], "val_loss": []}
 
         train_loader, _ = self._build_loader(X_w, y_w, ids_w, batch_size, shuffle=True)
-        if has_val:
-            val_loader, _ = self._build_loader(X_val_w, y_val_w, ids_val_w, batch_size, shuffle=False)
 
         for epoch in range(epochs):
             train_loss = self._run_epoch(train_loader, optimizer, criterion, training=True)
             self.history["train_loss"].append(train_loss)
 
             val_loss = None
-            if has_val:
+            if val_loader is not None:
                 val_loss = self._run_epoch(val_loader, optimizer, criterion, training=False)
                 self.history["val_loss"].append(val_loss)
 
@@ -202,13 +213,14 @@ class TorchBaseModel(BaseModel, nn.Module):
         Returns:
             pred : (n_windows,) float
         """
+        device = next(self.parameters()).device
         X_w, _, ids_w = self._make_windows(X, np.zeros(len(X)), ticker_ids)
         self.eval()
-        X_t = torch.tensor(X_w, dtype=torch.float32)
-        ids_t = torch.tensor(ids_w, dtype=torch.long) if ids_w is not None else None
+        X_t = torch.tensor(X_w, dtype=torch.float32).to(device)
+        ids_t = torch.tensor(ids_w, dtype=torch.long).to(device) if ids_w is not None else None
         with torch.no_grad():
             pred = self(X_t, ids_t)
-        return pred.numpy()
+        return pred.cpu().numpy()
 
     def predict_last(self, X, ticker_id: Optional[int] = None) -> float:
         """
@@ -221,12 +233,13 @@ class TorchBaseModel(BaseModel, nn.Module):
         if len(X) < self.seq_len:
             raise ValueError(f"need at least {self.seq_len} candles, got {len(X)}")
 
-        window_t = torch.tensor(X[-self.seq_len:], dtype=torch.float32).unsqueeze(0)
+        device = next(self.parameters()).device
+        window_t = torch.tensor(X[-self.seq_len:], dtype=torch.float32).unsqueeze(0).to(device)
 
         ids_t = None
         if self.mode != "single":
             assert ticker_id is not None, "ticker_id is required for pooled / finetune"
-            ids_t = torch.tensor([ticker_id], dtype=torch.long)
+            ids_t = torch.tensor([ticker_id], dtype=torch.long).to(device)
 
         self.eval()
         with torch.no_grad():

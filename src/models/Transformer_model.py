@@ -52,6 +52,7 @@ class TransformerModel(TorchBaseModel):
         mode: str = "single",
         num_tickers: int = 1,
         embedding_dim: int = 8,
+        device: Optional[str] = None,
     ):
         """
         input_size        : number of features
@@ -64,6 +65,7 @@ class TransformerModel(TorchBaseModel):
         mode              : "single" | "pooled" | "finetune"
         num_tickers       : number of assets (ignored when mode="single")
         embedding_dim     : dimension of asset embedding
+        device            : "cuda" / "mps" / "cpu" (auto-detected if None)
         """
         assert mode in ("single", "pooled", "finetune"), (
             f"mode is {mode}, should be 'single', 'pooled' or 'finetune'"
@@ -101,6 +103,7 @@ class TransformerModel(TorchBaseModel):
             self.fc = nn.Linear(d_model + embedding_dim, 1)
 
         self.history: Dict[str, List[float]] = {"train_loss": [], "val_loss": []}
+        self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor, ticker_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
@@ -115,6 +118,7 @@ class TransformerModel(TorchBaseModel):
             return self.fc(last).squeeze(-1)
 
         assert ticker_ids is not None, "ticker_ids is required for pooled and finetune modes"
+        assert self.ticker_embedding is not None
         emb = self.ticker_embedding(ticker_ids)
         return self.fc(torch.cat([last, emb], dim=1)).squeeze(-1)
 
@@ -150,6 +154,7 @@ class TransformerModel(TorchBaseModel):
         ids_val = np.full(len(X_val), ticker_id, dtype=np.int64) if X_val is not None else None
 
         if freeze_encoder:
+            assert self.ticker_embedding is not None
             trainable = list(self.fc.parameters()) + list(self.ticker_embedding.parameters())
             optimizer = optimizer or torch.optim.Adam(trainable, lr=1e-4)
         else:
@@ -168,26 +173,27 @@ class TransformerModel(TorchBaseModel):
 
     def save(self, path: str):
         torch.save({
-            "state_dict": self.state_dict(),
+            "state_dict": {k: v.cpu() for k, v in self.state_dict().items()},
             "config": {
-                "input_size":        self.input_size,
-                "d_model":           self.d_model,
-                "nhead":             self.nhead,
+                "input_size":         self.input_size,
+                "d_model":            self.d_model,
+                "nhead":              self.nhead,
                 "num_encoder_layers": self.num_encoder_layers,
-                "dim_feedforward":   self.dim_feedforward,
-                "dropout":           self.dropout_rate,
-                "seq_len":           self.seq_len,
-                "mode":              self.mode,
-                "num_tickers":       self.num_tickers,
-                "embedding_dim":     self.embedding_dim,
+                "dim_feedforward":    self.dim_feedforward,
+                "dropout":            self.dropout_rate,
+                "seq_len":            self.seq_len,
+                "mode":               self.mode,
+                "num_tickers":        self.num_tickers,
+                "embedding_dim":      self.embedding_dim,
             }
         }, path)
 
     @classmethod
-    def load(cls, path: str) -> "TransformerModel":
-        ckpt = torch.load(path, weights_only=True)
+    def load(cls, path: str, device: Optional[str] = None) -> "TransformerModel":
+        ckpt = torch.load(path, weights_only=True, map_location="cpu")
         cfg = dict(ckpt["config"])
         cfg.pop("horizon", None)
+        cfg["device"] = device
         model = cls(**cfg)
         model.load_state_dict(ckpt["state_dict"])
         return model
