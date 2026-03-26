@@ -1,31 +1,65 @@
-from Base_model import BaseModel, classification_metrics_df
+from Base_model import TorchBaseModel
 from torch import nn
+from typing import Optional, Dict, List
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 
 
-class CNNModel(BaseModel, nn.Module):
-    def __init__(self, input_size: int, num_filters: int = 64, num_layers: int = 2, kernel_size: int = 3, dropout: float = 0.1, horizon: int = 1, seq_len: int = 30):
+# Режимы работы модели:
+#
+#   "single"   — одна акция, ticker_ids не нужны.
+#
+#   "pooled"   — все акции сразу, одна общая модель.
+#                Каждой акции присваивается embedding-вектор.
+#                ticker_ids передаются в fit/predict.
+#
+#   "finetune" — двухэтапное обучение:
+#                1. pretrain(X, y, ticker_ids) — обучение на всех акциях
+#                2. finetune(X, y, ticker_id)  — дообучение на одной акции
+#                   (замораживает conv_blocks, обучает только fc + embedding)
+#
+# Таргет y строим заранее (shift, лог-доходность).
+# Для окна X[i : i+seq_len] метка — y[i + seq_len - 1] (последний бар окна).
+
+
+class CNNModel(TorchBaseModel):
+    def __init__(
+        self,
+        input_size: int,
+        num_filters: int = 64,
+        num_layers: int = 2,
+        kernel_size: int = 3,
+        dropout: float = 0.1,
+        seq_len: int = 30,
+        mode: str = "single",
+        num_tickers: int = 1,
+        embedding_dim: int = 8,
+    ):
         """
-        input:
-            input_size: number of features
-            num_filters: number of convolutional filters (channels)
-            num_layers: number of Conv1d blocks
-            kernel_size: size of the convolutional kernel
-            dropout: dropout rate between blocks
-            horizon: number of steps to predict (reserved for future use)
-            seq_len: length of the input sequence window
+        input_size    : number of features
+        num_filters   : number of convolutional filters (channels)
+        num_layers    : number of Conv1d blocks
+        kernel_size   : size of the convolutional kernel
+        dropout       : dropout rate between blocks
+        seq_len       : length of the input window
+        mode          : "single" | "pooled" | "finetune"
+        num_tickers   : number of assets (ignored for mode="single")
+        embedding_dim : dimension of the asset embedding
         """
+        assert mode in ("single", "pooled", "finetune"), (
+            f"mode is {mode}, should be 'single', 'pooled' or 'finetune'"
+        )
+
         nn.Module.__init__(self)
         self.input_size = input_size
         self.num_filters = num_filters
         self.num_layers = num_layers
         self.kernel_size = kernel_size
-        self.dropout = dropout
-        self.horizon = horizon
+        self.dropout_rate = dropout
         self.seq_len = seq_len
+        self.mode = mode
+        self.num_tickers = num_tickers
+        self.embedding_dim = embedding_dim
 
         blocks = []
         in_ch = input_size
@@ -38,193 +72,102 @@ class CNNModel(BaseModel, nn.Module):
             ]
             in_ch = num_filters
         self.conv_blocks = nn.Sequential(*blocks)
-
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
-        self.fc = nn.Linear(num_filters, 1)
-        self.history = {"train_loss": [], "val_loss": []}
+        if mode == "single":
+            self.ticker_embedding = None
+            self.fc = nn.Linear(num_filters, 1)
+        else:
+            self.ticker_embedding = nn.Embedding(num_tickers, embedding_dim)
+            self.fc = nn.Linear(num_filters + embedding_dim, 1)
 
+        self.history: Dict[str, List[float]] = {"train_loss": [], "val_loss": []}
 
-    def forward(self, x):
-        x = x.permute(0, 2, 1)             
-        x = self.conv_blocks(x)            
-        x = self.global_avg_pool(x)        
-        x = x.squeeze(-1)                  
-        return self.fc(x).squeeze(-1)    
-
-
-    def _make_windows(self, X: np.ndarray, y: np.ndarray):
+    def forward(self, x: torch.Tensor, ticker_ids: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
-        input:
-            X, y: ndarray (n_timesteps, n_features) / (n_timesteps,)
-        output:
-            X_win, y_win: ndarray (n_windows, seq_len, n_features) / (n_windows,)
+        x          : (batch, seq_len, input_size)
+        ticker_ids : (batch,) int — only needed for pooled / finetune
         """
-        X_win, y_win = [], []
-        for i in range(len(X) - self.seq_len + 1):
-            X_win.append(X[i : i + self.seq_len])
-            y_win.append(y[i + self.seq_len - 1])
-        return np.array(X_win, dtype=np.float32), np.array(y_win, dtype=np.float32)
+        x = x.permute(0, 2, 1)                     # (batch, input_size, seq_len)
+        x = self.conv_blocks(x)                     # (batch, num_filters, seq_len)
+        cnn_out = self.global_avg_pool(x).squeeze(-1)  # (batch, num_filters)
 
+        if self.mode == "single":
+            return self.fc(cnn_out).squeeze(-1)
 
-    def fit(self, X, y, X_val=None, y_val=None, optimizer=None, scheduler=None, epochs: int = 50, batch_size: int = 32, verbose: bool = True):
+        assert ticker_ids is not None, "ticker_ids is required for pooled and finetune modes"
+        emb = self.ticker_embedding(ticker_ids)
+        return self.fc(torch.cat([cnn_out, emb], dim=1)).squeeze(-1)
+
+    def finetune(
+        self,
+        X,
+        y,
+        ticker_id: int,
+        X_val=None,
+        y_val=None,
+        optimizer=None,
+        scheduler=None,
+        epochs: int = 20,
+        batch_size: int = 32,
+        verbose: bool = True,
+        freeze_conv: bool = True,
+    ):
         """
-        input:
-            X, y: np.ndarray (n_timesteps, n_features) / (n_timesteps,)
-            X_val, y_val: np.ndarray (n_timesteps, n_features) / (n_timesteps,)
-            optimizer: torch optimizer (default: Adam lr=1e-3)
-            scheduler: lr scheduler
-            epochs: number of training epochs
-            batch_size: mini-batch size
-            verbose: print progress every 10 epochs
+        Stage 2: fine-tune on a single asset.
+        Only for mode="finetune", after pretrain().
+
+        ticker_id   : index of the asset
+        freeze_conv : True — freezes conv_blocks, trains only fc + embedding
+                      False — trains the entire model with smaller lr
         """
-        X_w, y_w = self._make_windows(X, y)
+        assert self.mode == "finetune", "finetune() is only available for mode='finetune'"
+        print(f"=== Finetune (ticker_id={ticker_id}, freeze_conv={freeze_conv}) ===")
 
-        has_val = X_val is not None and y_val is not None
-        if has_val:
-            X_val_w, y_val_w = self._make_windows(X_val, y_val)
+        for param in self.conv_blocks.parameters():
+            param.requires_grad = not freeze_conv
 
-        optimizer = optimizer or torch.optim.Adam(self.parameters(), lr=1e-3)
-        criterion = nn.BCEWithLogitsLoss()
-        self.history = {"train_loss": [], "val_loss": []}
+        ids = np.full(len(X), ticker_id, dtype=np.int64)
+        ids_val = np.full(len(X_val), ticker_id, dtype=np.int64) if X_val is not None else None
 
-        X_t = torch.tensor(X_w, dtype=torch.float32)
-        y_t = torch.tensor(y_w, dtype=torch.float32)
-        dataset = torch.utils.data.TensorDataset(X_t, y_t)
-        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        if freeze_conv:
+            trainable = list(self.fc.parameters()) + list(self.ticker_embedding.parameters())
+            optimizer = optimizer or torch.optim.Adam(trainable, lr=1e-4)
+        else:
+            optimizer = optimizer or torch.optim.Adam(self.parameters(), lr=1e-4)
 
-        if has_val:
-            X_val_t = torch.tensor(X_val_w, dtype=torch.float32)
-            y_val_t = torch.tensor(y_val_w, dtype=torch.float32)
+        self.fit(
+            X, y,
+            ticker_ids=ids,
+            X_val=X_val, y_val=y_val, ticker_ids_val=ids_val,
+            optimizer=optimizer, scheduler=scheduler,
+            epochs=epochs, batch_size=batch_size, verbose=verbose,
+        )
 
-        for epoch in range(epochs):
-            self.train()
-            total_loss = 0.0
-            for X_b, y_b in loader:
-                optimizer.zero_grad()
-                loss = criterion(self(X_b), y_b)
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item() * len(X_b)
-
-            train_loss = total_loss / len(dataset)
-            self.history["train_loss"].append(train_loss)
-
-            val_loss = None
-            if has_val:
-                self.eval()
-                with torch.no_grad():
-                    val_loss = criterion(self(X_val_t), y_val_t).item()
-                self.history["val_loss"].append(val_loss)
-
-            if scheduler is not None:
-                scheduler.step()
-
-            if verbose and (epoch + 1) % 10 == 0:
-                lr = optimizer.param_groups[0]["lr"]
-                val_str = f"  val_loss={val_loss:.6f}" if val_loss is not None else ""
-                print(f"Epoch {epoch+1}/{epochs}  train_loss={train_loss:.6f}{val_str}  lr={lr:.2e}")
-
-
-    def plot_loss(self):
-        train = self.history.get("train_loss", [])
-        val = self.history.get("val_loss", [])
-
-        if not train:
-            raise RuntimeError("fit model before plotting loss")
-
-        epochs = range(1, len(train) + 1)
-        plt.figure(figsize=(9, 4))
-        plt.plot(epochs, train, label="Train loss")
-        if val:
-            plt.plot(epochs, val, label="Val loss")
-        plt.xlabel("Epoch")
-        plt.ylabel("BCE Loss")
-        plt.title("Loss by epochs")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-
-    def predict_proba(self, X) -> np.ndarray:
-        """
-        input:
-            X: ndarray (n_timesteps, n_features)
-        output:
-            proba: ndarray (n_samples,) ∈ [0, 1]
-        """
-        X_w, _ = self._make_windows(X, np.zeros(len(X)))
-        self.eval()
-        with torch.no_grad():
-            proba = torch.sigmoid(self(torch.tensor(X_w, dtype=torch.float32)))
-        return proba.numpy()
-
-    def predict(self, X, threshold: float = 0.5) -> np.ndarray:
-        """
-        input:
-            X: ndarray (n_timesteps, n_features)
-            threshold: decision threshold
-        output:
-            pred: ndarray (n_samples,) int
-        """
-        return (self.predict_proba(X) >= threshold).astype(int)
-
-    def predict_last(self, X, threshold: float = 0.5) -> tuple[float, bool]:
-        """
-        input:
-            X: ndarray (n_timesteps, n_features)
-            threshold: decision threshold
-        output:
-            proba: float ∈ [0, 1]
-            pred: bool
-        """
-        if len(X) < self.seq_len:
-            raise ValueError(f"need at least {self.seq_len} candles, got {len(X)}")
-
-        window = X[-self.seq_len :]
-        window_t = torch.tensor(window, dtype=torch.float32).unsqueeze(0)
-
-        self.eval()
-        with torch.no_grad():
-            proba = torch.sigmoid(self(window_t)).item()
-
-        return proba, proba >= threshold
-
-    def scores(self, X, y, model_name: str, threshold: float = 0.5) -> pd.DataFrame:
-        """
-        input:
-            X: ndarray (n_timesteps, n_features)
-            y: ndarray (n_timesteps,)
-            model_name: label for the metrics row
-            threshold: decision threshold for binary classification
-        output:
-            pd.DataFrame  shape (1, n_metrics), index=[model_name]
-        """
-        _, y_w = self._make_windows(X, y)
-        proba = self.predict_proba(X)
-        return classification_metrics_df(y_w, proba, model_name, threshold=threshold)
-
+        for param in self.conv_blocks.parameters():
+            param.requires_grad = True
 
     def save(self, path: str):
-        """
-        input:
-            path: str
-        """
         torch.save({
             "state_dict": self.state_dict(),
             "config": {
-                "input_size":  self.input_size,
-                "num_filters": self.num_filters,
-                "num_layers":  self.num_layers,
-                "kernel_size": self.kernel_size,
-                "dropout":     self.dropout,
-                "horizon":     self.horizon,
-                "seq_len":     self.seq_len,
+                "input_size":    self.input_size,
+                "num_filters":   self.num_filters,
+                "num_layers":    self.num_layers,
+                "kernel_size":   self.kernel_size,
+                "dropout":       self.dropout_rate,
+                "seq_len":       self.seq_len,
+                "mode":          self.mode,
+                "num_tickers":   self.num_tickers,
+                "embedding_dim": self.embedding_dim,
             }
         }, path)
 
     @classmethod
     def load(cls, path: str) -> "CNNModel":
-        ckpt  = torch.load(path, weights_only=True)
-        model = cls(**ckpt["config"])
+        ckpt = torch.load(path, weights_only=True)
+        cfg = dict(ckpt["config"])
+        cfg.pop("horizon", None)
+        model = cls(**cfg)
         model.load_state_dict(ckpt["state_dict"])
         return model
