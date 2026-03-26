@@ -21,8 +21,8 @@ MOEX_TOKEN = Path(__file__).resolve().parents[2].joinpath('.env').read_text().sp
 
 DATE_BEGIN  = "2020-07-06"   # данные obstats доступны с этой даты
 DATE_END    = "2026-03-25"
-BATCH_DAYS  = 30
-WORKERS     = 6
+BATCH_DAYS  = 90
+WORKERS     = 12
 
 
 def DataTransform(data_ob: pd.DataFrame, data_tr: pd.DataFrame, data_or: pd.DataFrame) -> pd.DataFrame:
