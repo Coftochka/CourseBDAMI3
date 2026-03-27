@@ -1,7 +1,7 @@
 from dotenv import load_dotenv; 
 from pathlib import Path
 
-PATH_TO_DATA="" # чтобы подавить подчеркивание. подтягивается из .env
+PATH_TO_DATA="." # чтобы подавить подчеркивание. подтягивается из .env
 env_path = Path(__file__).resolve().parents[3] / '.env'
 load_dotenv(dotenv_path=env_path)
 
@@ -16,18 +16,28 @@ class DatasetType(Enum):
         if self == DatasetType.SuperCandels:
             return f"{ticker_name}_SUPER_FULL.csv"
         elif self == DatasetType.BasicCandels:
-            return f"{ticker_name}_BASIC_FULL.csv"
+            return f"{ticker_name}_BASIC_FULL.parquet"
         return f"{ticker_name}.csv"
+
+    def getLoader(self):
+        if self == DatasetType.SuperCandels:
+            return pd.read_csv
+        elif self == DatasetType.BasicCandels:
+            return pd.read_parquet
+        return
+    
 
 class Dataset:
     def _Load_(self, ticker_name : str, dtype : DatasetType):
         try:
 
-            filename = dtype.get_filename(ticker_name)
+            filename = dtype.getFilename(ticker_name)
             file_path = Path(PATH_TO_DATA) / ticker_name / filename
-
-            df = pd.from_csv(file_path, header=0)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            if dtype == DatasetType.SuperCandels:
+                df = pd.read_csv(file_path, header=0, parse_dates=["timestamp"])
+            elif dtype == DatasetType.BasicCandels:
+                df = pd.read_parquet(file_path)        
             return df
         
         except Exception as e:
@@ -57,8 +67,13 @@ class Dataset:
         self.inited = False
         self.data_type = DatasetType
         self._Split_(self._Load_(ticker_name, dtype), val_ratio, test_ratio)
-        return self
     
+    def ApplyTransform(self, func):
+        self.train = func(self.train)
+        self.val = func(self.val)
+        self.test = func(self.val)  
+        return None
+
     def GetTrain(self) -> pd.DataFrame:
         return self.train
     
@@ -67,3 +82,4 @@ class Dataset:
     
     def GetTest(self) -> pd.DataFrame:
         return self.test
+
