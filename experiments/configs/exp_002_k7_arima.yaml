@@ -1,0 +1,56 @@
+experiment:
+  name: exp_002_k7_arima
+  description: "k=7 clusters, ARIMA baseline vs LSTM vs RNN"
+
+# ── Embeddings ────────────────────────────────────────────────────────────────
+embedder:
+  hidden_size: 64
+  num_layers: 3
+  dropout: 0.1
+  epochs: 50
+  batch_size: 512
+
+data:
+  X_train: src/data/windows/X_train.npy
+  y_train: src/data/windows/y_train.npy
+  X_val:   src/data/windows/X_val.npy
+  y_val:   src/data/windows/y_val.npy
+
+output:
+  model:     src/data/embeddings/lstm_embedder_h64_l3.pt
+  emb_train: src/data/embeddings/emb_train.npy
+  emb_val:   src/data/embeddings/emb_val.npy
+
+# ── Clustering ────────────────────────────────────────────────────────────────
+clustering:
+  n_clusters: 7
+  scale: true
+  random_state: 42
+  kmeans_path: src/data/clusters/kmeans_k7.pkl
+  labels_train: src/data/clusters/labels_train_k7.npy
+  labels_val:   src/data/clusters/labels_val_k7.npy
+
+# ── Forecasting models ────────────────────────────────────────────────────────
+models:
+  - type: arima
+    order: [2, 1, 2]
+    seasonal_order: null
+
+  - type: lstm
+    hidden_size: 64
+    num_layers: 2
+    epochs: 50
+    batch_size: 256
+    seq_len: 24
+
+  - type: rnn
+    hidden_size: 64
+    num_layers: 2
+    epochs: 50
+    batch_size: 256
+    seq_len: 24
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+evaluation:
+  metrics: [mae, rmse, mape, dir_accuracy, ic]
+  results_dir: results/exp_002_k7_arima

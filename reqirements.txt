@@ -5,6 +5,8 @@ pandas
 numpy
 scipy
 scikit-learn
+umap-learn
+hdbscan
 seaborn 
 matplotlib
 pathlib

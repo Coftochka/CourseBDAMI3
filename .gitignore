@@ -1,10 +1,23 @@
 .env
 *pycache*
-*.csv
 *venv*
 pyrightconfig.json
 .vscode
+
+# ── CSV (кроме агрегированных датасетов) ─────────────────────────────────────
+*.csv
 !*SUPER_FULL.csv
 !*BASIC_FULL.csv
 !*HEAD?.csv
 !*HEAD??.csv
+
+# ── Тяжёлые артефакты пайплайна (окна, эмбеддинги, кластеры) ─────────────────
+src/data/windows/
+src/data/embeddings/
+src/data/clusters/
+
+# ── Результаты экспериментов ──────────────────────────────────────────────────
+results/
+
+# ── Jupyter checkpoints ───────────────────────────────────────────────────────
+.ipynb_checkpoints/
