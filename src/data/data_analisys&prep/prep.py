@@ -97,14 +97,17 @@ def make_windows(
         std  = window.std(axis=0, keepdims=True)  
         window_norm = (window - mean) / (std + 1e-8)
 
-        close_last = (close_all[end - 1] - mean[0, close_idx]) / (std[0, close_idx] + 1e-8)
-        close_next = (close_all[end - 1 + horizon] - mean[0, close_idx]) / (std[0, close_idx] + 1e-8)
-        target = np.log((close_next + 1e-8) / (close_last + 1e-8))
+        close_last = close_all[end - 1]
+        close_next = close_all[end - 1 + horizon]
+        target = np.log(close_next / close_last) if close_last > 0 and close_next > 0 else np.nan
 
         X.append(window_norm)
         y.append(target)
 
-    return np.array(X), np.array(y, dtype=np.float32)
+    X_arr = np.array(X)
+    y_arr = np.array(y, dtype=np.float32)
+    mask  = ~np.isnan(y_arr)
+    return X_arr[mask], y_arr[mask]
 
 
 def cut_on_windows(
