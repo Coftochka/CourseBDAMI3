@@ -5,21 +5,8 @@ import torch
 import numpy as np
 
 
-# Режимы работы модели:
-#
-#   "single"   — одна акция, ticker_ids не нужны.
-#
-#   "pooled"   — все акции сразу, одна общая модель.
-#                Каждой акции присваивается embedding-вектор.
-#                ticker_ids передаются в fit/predict.
-#
-#   "finetune" — двухэтапное обучение:
-#                1. pretrain(X, y, ticker_ids) — обучение на всех акциях
-#                2. finetune(X, y, ticker_id)  — дообучение на одной акции
-#                   (замораживает LSTM, обучает только fc + embedding)
-#
-# Таргет y строишь сам (shift, лог-доходность).
-# Для окна X[i : i+seq_len] метка — y[i + seq_len - 1] (последний бар окна).
+# X: (n_timesteps, n_features); для SBER — schema.FEATURE_COLS / schema.INPUT_SIZE.
+# Режимы и таргет — как в корневом LSTM_model.
 
 
 class LSTMModel(TorchBaseModel):
@@ -35,7 +22,7 @@ class LSTMModel(TorchBaseModel):
         device: Optional[str] = None,
     ):
         """
-        input_size    : number of features
+        input_size    : number of features (для SBER — schema.INPUT_SIZE)
         hidden_size   : size of the hidden layer LSTM
         num_layers    : number of LSTM layers
         seq_len       : length of the input window
@@ -100,6 +87,7 @@ class LSTMModel(TorchBaseModel):
         batch_size: int = 32,
         verbose: bool = True,
         freeze_lstm: bool = True,
+        **fit_kwargs,
     ):
         """
         Stage 2: fine-tune on a single asset.
@@ -131,6 +119,7 @@ class LSTMModel(TorchBaseModel):
             X_val=X_val, y_val=y_val, ticker_ids_val=ids_val,
             optimizer=optimizer, scheduler=scheduler,
             epochs=epochs, batch_size=batch_size, verbose=verbose,
+            **fit_kwargs,
         )
 
         for param in self.lstm.parameters():
