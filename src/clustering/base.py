@@ -33,7 +33,3 @@ class BaseClusterer(ABC):
     def load(cls, path: str | Path) -> "BaseClusterer":
         with open(path, "rb") as f:
             return pickle.load(f)
-
-    def _check_fitted(self, attr: str = "_fitted"):
-        if not getattr(self, attr, False):
-            raise RuntimeError("Call fit() first.")

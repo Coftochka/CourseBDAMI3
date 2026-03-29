@@ -5,21 +5,7 @@ import torch
 import numpy as np
 
 
-# Режимы работы модели:
-#
-#   "single"   — одна акция, ticker_ids не нужны.
-#
-#   "pooled"   — все акции сразу, одна общая модель.
-#                Каждой акции присваивается embedding-вектор.
-#                ticker_ids передаются в fit/predict.
-#
-#   "finetune" — двухэтапное обучение:
-#                1. pretrain(X, y, ticker_ids) — обучение на всех акциях
-#                2. finetune(X, y, ticker_id)  — дообучение на одной акции
-#                   (замораживает GRU, обучает только fc + embedding)
-#
-# Таргет y строим заранее (shift, лог-доходность).
-# Для окна X[i : i+seq_len] метка — y[i + seq_len - 1] (последний бар окна).
+# X: (n_timesteps, n_features); для SBER — schema.FEATURE_COLS / schema.INPUT_SIZE.
 
 
 class GRUModel(TorchBaseModel):
@@ -35,7 +21,7 @@ class GRUModel(TorchBaseModel):
         device: Optional[str] = None,
     ):
         """
-        input_size    : number of features
+        input_size    : number of features (для SBER — schema.INPUT_SIZE)
         hidden_size   : size of the hidden layer GRU
         num_layers    : number of GRU layers
         seq_len       : length of the input window
@@ -99,6 +85,7 @@ class GRUModel(TorchBaseModel):
         batch_size: int = 32,
         verbose: bool = True,
         freeze_gru: bool = True,
+        **fit_kwargs,
     ):
         """
         Stage 2: fine-tune on a single asset.
@@ -130,6 +117,7 @@ class GRUModel(TorchBaseModel):
             X_val=X_val, y_val=y_val, ticker_ids_val=ids_val,
             optimizer=optimizer, scheduler=scheduler,
             epochs=epochs, batch_size=batch_size, verbose=verbose,
+            **fit_kwargs,
         )
 
         for param in self.gru.parameters():

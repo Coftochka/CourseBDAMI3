@@ -6,21 +6,12 @@ import numpy as np
 import math
 
 
-# Режимы работы модели:
+# Входные ряды X: (n_timesteps, n_features); для parquet SBER задайте
+# input_size = schema.INPUT_SIZE и порядок признаков как в schema.FEATURE_COLS.
+# forward принимает x: (batch, seq_len, input_size).
 #
-#   "single"   — одна акция, ticker_ids не нужны.
-#
-#   "pooled"   — все акции сразу, одна общая модель.
-#                Каждой акции присваивается embedding-вектор.
-#                ticker_ids передаются в fit/predict.
-#
-#   "finetune" — двухэтапное обучение:
-#                1. pretrain(X, y, ticker_ids) — обучение на всех акциях
-#                2. finetune(X, y, ticker_id)  — дообучение на одной акции
-#                   (замораживает encoder, обучает только fc + embedding)
-#
-# Таргет y строим заранее (shift, лог-доходность).
-# Для окна X[i : i+seq_len] метка — y[i + seq_len - 1] (последний бар окна).
+# Режимы: "single" | "pooled" | "finetune" (см. корневой Transformer_model).
+# Таргет y строится снаружи; для окна X[i : i+seq_len] метка — y[i + seq_len - 1].
 
 
 class PositionalEncoding(nn.Module):
@@ -55,7 +46,7 @@ class TransformerModel(TorchBaseModel):
         device: Optional[str] = None,
     ):
         """
-        input_size        : number of features
+        input_size        : число признаков на шаг (для SBER — schema.INPUT_SIZE)
         d_model           : dimension of embedding (must be divisible by nhead)
         nhead             : number of attention heads
         num_encoder_layers: number of TransformerEncoder layers
@@ -135,6 +126,7 @@ class TransformerModel(TorchBaseModel):
         batch_size: int = 32,
         verbose: bool = True,
         freeze_encoder: bool = True,
+        **fit_kwargs,
     ):
         """
         Stage 2: fine-tune on a single asset.
@@ -166,6 +158,7 @@ class TransformerModel(TorchBaseModel):
             X_val=X_val, y_val=y_val, ticker_ids_val=ids_val,
             optimizer=optimizer, scheduler=scheduler,
             epochs=epochs, batch_size=batch_size, verbose=verbose,
+            **fit_kwargs,
         )
 
         for param in list(self.input_projection.parameters()) + list(self.transformer_encoder.parameters()):

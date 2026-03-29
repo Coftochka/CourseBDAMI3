@@ -1,4 +1,4 @@
-from Base_model import BaseModel
+from Base_model import BaseModel, RegressionMetricsAccumulator
 import numpy as np
 import lightgbm as lgb
 import matplotlib.pyplot as plt
@@ -6,25 +6,10 @@ import json
 import copy
 import pandas as pd
 from typing import Optional, Dict, List
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
-# Режимы работы модели:
-#
-#   "single"   — одна акция, ticker_ids не нужны.
-#
-#   "pooled"   — все акции сразу, одна общая модель.
-#                ticker_id добавляется как последняя фича в окно.
-#                ticker_ids передаются в fit/predict.
-#
-#   "finetune" — двухэтапное обучение:
-#                1. pretrain(X, y, ticker_ids) — обучение pooled-модели на всех акциях
-#                2. finetune(X, y, ticker_id)  — дообучение на одной акции:
-#                   копируем pretrained booster и добавляем деревья поверх него
-#                   (init_model + n_finetune_estimators с меньшим lr)
-#
-# Таргет y строим заранее (shift, лог-доходность).
-# Для окна X[i : i+seq_len] метка — y[i + seq_len - 1] (последний бар окна).
+# X: (n_samples, seq_len, n_features) — как после prepare_windows / как у TorchBaseModel;
+# внутри строки flatten в вектор фич для LGBM (+ ticker_id в pooled/finetune).
 
 
 class LightGBMModel(BaseModel):
@@ -44,7 +29,7 @@ class LightGBMModel(BaseModel):
         mode: str = "single",
     ):
         """
-        input_size        : number of features per timestep
+        input_size        : number of features per timestep (для SBER — schema.INPUT_SIZE)
         n_estimators      : number of boosting rounds
         learning_rate     : shrinkage rate
         num_leaves        : max leaves per tree
@@ -83,31 +68,51 @@ class LightGBMModel(BaseModel):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _make_windows(
+    def _check_windowed_X(self, X: np.ndarray) -> np.ndarray:
+        X = np.asarray(X, dtype=np.float32)
+        if X.ndim != 3:
+            raise ValueError(
+                f"X must be (n_samples, seq_len, n_features), got shape {X.shape}"
+            )
+        if X.shape[1] != self.seq_len:
+            raise ValueError(
+                f"X: expected seq_len={self.seq_len}, got {X.shape[1]}"
+            )
+        if X.shape[2] != self.input_size:
+            raise ValueError(
+                f"X: expected n_features={self.input_size}, got {X.shape[2]}"
+            )
+        return X
+
+    def _rows_to_lgbm_matrix(
         self,
         X: np.ndarray,
-        y: np.ndarray,
-        ticker_ids: Optional[np.ndarray] = None,
-    ):
+        ticker_ids: Optional[np.ndarray],
+    ) -> np.ndarray:
         """
-        X          : (n_timesteps, n_features)
-        y          : (n_timesteps,)
-        ticker_ids : (n_timesteps,) int — optional; appended as last feature
-
-        Returns:
-        X_win  : (n_windows, seq_len * n_features [+ 1])  — flattened
-        y_win  : (n_windows,)
+        Оконный батч → 2D матрица признаков для LGBM.
+        Каждая строка: flatten окна, при pooled/finetune в конец — ticker_id.
         """
-        X_win, y_win = [], []
-        max_i = len(X) - self.seq_len + 1
-        for i in range(max_i):
-            window = X[i: i + self.seq_len].flatten()
-            if ticker_ids is not None:
-                window = np.append(window, ticker_ids[i + self.seq_len - 1])
-            X_win.append(window)
-            y_win.append(y[i + self.seq_len - 1])
+        X = self._check_windowed_X(X)
+        n = X.shape[0]
+        if self.mode != "single":
+            if ticker_ids is None:
+                raise ValueError(f"ticker_ids is required for mode='{self.mode}'")
+            tid = np.asarray(ticker_ids, dtype=np.int64)
+            if tid.shape != (n,):
+                raise ValueError(
+                    f"ticker_ids must be shape ({n},), got {tid.shape}"
+                )
+        else:
+            tid = None
 
-        return np.array(X_win, dtype=np.float32), np.array(y_win, dtype=np.float32)
+        rows = []
+        for i in range(n):
+            w = X[i].reshape(-1)
+            if tid is not None:
+                w = np.append(w, float(tid[i]))
+            rows.append(w)
+        return np.array(rows, dtype=np.float32)
 
     def _build_feature_names(self, n_features: int, with_ticker: bool = False) -> List[str]:
         names = []
@@ -195,10 +200,11 @@ class LightGBMModel(BaseModel):
         ticker_ids_val=None,
         epochs: int = None,
         verbose: bool = True,
+        **kwargs,
     ):
         """
-        X, y         : training data. y — target (float), preprocessed.
-        ticker_ids   : (n_timesteps,) int — required for pooled / finetune.
+        X, y         : оконные — X (n_samples, seq_len, n_features), y (n_samples,).
+        ticker_ids   : (n_samples,) int — для pooled / finetune.
 
         mode="single":
             fit(X, y, X_val=..., y_val=...)
@@ -208,6 +214,8 @@ class LightGBMModel(BaseModel):
 
         mode="finetune":
             Use pretrain() and finetune() instead of fit() directly.
+
+        kwargs : игнорируются (совместимость с Torch fit: checkpoint_dir и т.д.).
         """
         if self.mode != "single":
             assert ticker_ids is not None, f"ticker_ids is required for mode='{self.mode}'"
@@ -215,13 +223,26 @@ class LightGBMModel(BaseModel):
         if epochs is not None:
             self.n_estimators = epochs
 
+        X = self._check_windowed_X(X)
+        y_w = np.asarray(y, dtype=np.float32)
+        if y_w.shape != (X.shape[0],):
+            raise ValueError(
+                f"y must be shape ({X.shape[0]},), got {y_w.shape}"
+            )
+
         with_ticker = ticker_ids is not None
-        X_w, y_w = self._make_windows(X, y, ticker_ids)
-        self.feature_names = self._build_feature_names(X.shape[1], with_ticker=with_ticker)
+        X_w = self._rows_to_lgbm_matrix(X, ticker_ids)
+        self.feature_names = self._build_feature_names(self.input_size, with_ticker=with_ticker)
 
         X_val_w, y_val_w = None, None
         if X_val is not None and y_val is not None:
-            X_val_w, y_val_w = self._make_windows(X_val, y_val, ticker_ids_val)
+            X_val = self._check_windowed_X(X_val)
+            y_val_w = np.asarray(y_val, dtype=np.float32)
+            if y_val_w.shape != (X_val.shape[0],):
+                raise ValueError(
+                    f"y_val must be shape ({X_val.shape[0]},), got {y_val_w.shape}"
+                )
+            X_val_w = self._rows_to_lgbm_matrix(X_val, ticker_ids_val)
 
         self._model = self._fit_lgbm(
             self._make_lgbm(), X_w, y_w, X_val_w, y_val_w, verbose
@@ -267,13 +288,25 @@ class LightGBMModel(BaseModel):
         assert self._model is not None, "call pretrain() before finetune()"
         print(f"=== Finetune (ticker_id={ticker_id}, n_trees={n_finetune_estimators}, lr={finetune_lr}) ===")
 
-        ids = np.full(len(X), ticker_id, dtype=np.int64)
-        ids_val = np.full(len(X_val), ticker_id, dtype=np.int64) if X_val is not None else None
+        X = self._check_windowed_X(X)
+        n = X.shape[0]
+        ids = np.full(n, ticker_id, dtype=np.int64)
 
-        X_w, y_w = self._make_windows(X, y, ids)
+        y_w = np.asarray(y, dtype=np.float32)
+        if y_w.shape != (n,):
+            raise ValueError(f"y must be shape ({n},), got {y_w.shape}")
+        X_w = self._rows_to_lgbm_matrix(X, ids)
+
         X_val_w, y_val_w = None, None
         if X_val is not None and y_val is not None:
-            X_val_w, y_val_w = self._make_windows(X_val, y_val, ids_val)
+            X_val = self._check_windowed_X(X_val)
+            ids_val = np.full(X_val.shape[0], ticker_id, dtype=np.int64)
+            y_val_w = np.asarray(y_val, dtype=np.float32)
+            if y_val_w.shape != (X_val.shape[0],):
+                raise ValueError(
+                    f"y_val shape mismatch: got {y_val_w.shape}, expected ({X_val.shape[0]},)"
+                )
+            X_val_w = self._rows_to_lgbm_matrix(X_val, ids_val)
 
         # copy pretrained booster — pretrain stays intact
         pretrained_booster = copy.deepcopy(self._model.booster_)
@@ -294,35 +327,71 @@ class LightGBMModel(BaseModel):
         assert self._model is not None, "model is not fitted yet, call fit() / pretrain() first"
         return self._model
 
-    def predict(self, X, ticker_ids=None, use_finetune: bool = False) -> np.ndarray:
+    def predict(
+        self,
+        X,
+        ticker_ids=None,
+        use_finetune: bool = False,
+        batch_size: int = 4096,
+    ) -> np.ndarray:
         """
-        X              : (n_timesteps, n_features)
-        ticker_ids     : (n_timesteps,) int — required for pooled / finetune
+        X              : (n_samples, seq_len, n_features) — как в fit
+        ticker_ids     : (n_samples,) int — для pooled / finetune
         use_finetune   : if True, uses the fine-tuned model (mode="finetune" only)
+        batch_size     : предсказание порциями (меньше пиковая память на больших n).
 
         Returns:
-            pred : (n_windows,) float
+            pred : (n_samples,) float
         """
         model = self._active_model(finetune=use_finetune)
-        X_w, _ = self._make_windows(X, np.zeros(len(X)), ticker_ids)
-        return model.predict(self._to_df(X_w)).astype(np.float32)
+        X = self._check_windowed_X(X)
+        n = X.shape[0]
+        if self.mode != "single":
+            if ticker_ids is None:
+                raise ValueError(f"ticker_ids is required for mode='{self.mode}'")
+            tid = np.asarray(ticker_ids, dtype=np.int64)
+            if tid.shape != (n,):
+                raise ValueError(
+                    f"ticker_ids must be shape ({n},), got {tid.shape}"
+                )
+        else:
+            tid = None
+        outs: List[np.ndarray] = []
+        for start in range(0, n, batch_size):
+            end = min(start + batch_size, n)
+            Xb = X[start:end]
+            ids_b = tid[start:end] if tid is not None else None
+            X_w = self._rows_to_lgbm_matrix(Xb, ids_b)
+            outs.append(model.predict(self._to_df(X_w)).astype(np.float32))
+        if not outs:
+            return np.zeros(0, dtype=np.float32)
+        return np.concatenate(outs, axis=0)
 
     def predict_last(self, X, ticker_id: Optional[int] = None, use_finetune: bool = False) -> float:
         """
-        X            : (n_timesteps, n_features) — at least seq_len rows
-        ticker_id    : int — required for pooled / finetune
+        X            : (seq_len, n_features), (1, seq_len, n_features) или (N, seq_len, n_features) — берётся X[-1]
+        ticker_id    : int — для pooled / finetune
         use_finetune : if True, uses the fine-tuned model (mode="finetune" only)
 
         Returns:
             predicted return : float
         """
         model = self._active_model(finetune=use_finetune)
-        if len(X) < self.seq_len:
-            raise ValueError(f"need at least {self.seq_len} candles, got {len(X)}")
+        X = np.asarray(X, dtype=np.float32)
+        if X.ndim == 3:
+            X = X[-1]
+        if X.ndim != 2:
+            raise ValueError(f"predict_last: ожидается окно (seq_len, n_features), got {X.shape}")
+        if X.shape != (self.seq_len, self.input_size):
+            raise ValueError(
+                f"predict_last: ожидается ({self.seq_len}, {self.input_size}), got {X.shape}"
+            )
 
-        window = X[-self.seq_len:].flatten()
-        if ticker_id is not None:
-            window = np.append(window, ticker_id)
+        window = X.reshape(-1)
+        if self.mode != "single":
+            if ticker_id is None:
+                raise ValueError("ticker_id is required for pooled / finetune")
+            window = np.append(window, float(ticker_id))
         window = window.reshape(1, -1).astype(np.float32)
         return float(model.predict(self._to_df(window))[0])
 
@@ -332,25 +401,9 @@ class LightGBMModel(BaseModel):
         y_pred: np.ndarray,
         model_name: str,
     ) -> pd.DataFrame:
-        """
-        y_true : real returns
-        y_pred : predicted returns
-        """
-        mse = mean_squared_error(y_true, y_pred)
-        mae = mean_absolute_error(y_true, y_pred)
-        r2 = r2_score(y_true, y_pred)
-        dir_acc = float(np.mean(np.sign(y_true) == np.sign(y_pred)))
-        ic = float(np.corrcoef(y_true, y_pred)[0, 1])
-
-        metrics = {
-            "mse": mse,
-            "rmse": np.sqrt(mse),
-            "mae": mae,
-            "r2": r2,
-            "dir_accuracy": dir_acc,
-            "ic": ic,
-        }
-        return pd.DataFrame(metrics, index=[model_name])
+        acc = RegressionMetricsAccumulator()
+        acc.update(y_true, y_pred)
+        return acc.to_dataframe(model_name)
 
     def scores(
         self,
@@ -359,16 +412,43 @@ class LightGBMModel(BaseModel):
         model_name: str,
         ticker_ids=None,
         use_finetune: bool = False,
+        batch_size: int = 4096,
     ) -> pd.DataFrame:
         """
-        Regression metrics on the sample.
+        Regression metrics on the sample (батчи predict — меньше пиковая память).
 
         For multiple assets, pass ticker_ids — you'll get aggregated metrics.
         For metrics per asset separately, use scores_per_ticker().
         """
-        _, y_w = self._make_windows(X, y, ticker_ids)
-        y_pred = self.predict(X, ticker_ids, use_finetune=use_finetune)
-        return self._regression_metrics_df(y_w, y_pred, model_name)
+        X = self._check_windowed_X(X)
+        n = X.shape[0]
+        y_w = np.asarray(y, dtype=np.float32)
+        if y_w.shape != (n,):
+            raise ValueError(
+                f"y must be shape ({n},), got {y_w.shape}"
+            )
+        if self.mode != "single":
+            if ticker_ids is None:
+                raise ValueError(f"ticker_ids is required for mode='{self.mode}'")
+            tid = np.asarray(ticker_ids, dtype=np.int64)
+            if tid.shape != (n,):
+                raise ValueError(
+                    f"ticker_ids must be shape ({n},), got {tid.shape}"
+                )
+        else:
+            tid = None
+
+        model = self._active_model(finetune=use_finetune)
+        acc = RegressionMetricsAccumulator()
+        for start in range(0, n, batch_size):
+            end = min(start + batch_size, n)
+            Xb = X[start:end]
+            yb = y_w[start:end]
+            ids_b = tid[start:end] if tid is not None else None
+            X_w = self._rows_to_lgbm_matrix(Xb, ids_b)
+            pred = model.predict(self._to_df(X_w)).astype(np.float32)
+            acc.update(yb, pred)
+        return acc.to_dataframe(model_name)
 
     def scores_per_ticker(
         self,
@@ -376,37 +456,50 @@ class LightGBMModel(BaseModel):
         y_dict: Dict[str, np.ndarray],
         ticker_to_id: Dict[str, int],
         use_finetune: bool = False,
+        batch_size: int = 4096,
     ) -> pd.DataFrame:
         """
-        X_dict       : {"AAPL": X_aapl, "MSFT": X_msft, ...}
-        y_dict       : {"AAPL": y_aapl, "MSFT": y_msft, ...}
+        X_dict       : тикер → X (n_samples, seq_len, n_features)
+        y_dict       : тикер → y (n_samples,)
         ticker_to_id : {"AAPL": 0, "MSFT": 1, ...}
 
         Returns:
             DataFrame — one row per ticker + "ALL" (aggregate) row
         """
-        frames = []
-        all_y, all_pred = [], []
+        frames: List[pd.DataFrame] = []
+        all_acc = RegressionMetricsAccumulator()
+        model = self._active_model(finetune=use_finetune)
 
         for ticker, X in X_dict.items():
             y = y_dict[ticker]
+            X = self._check_windowed_X(X)
             ticker_ids = (
                 None if self.mode == "single"
-                else np.full(len(X), ticker_to_id[ticker], dtype=np.int64)
+                else np.full(X.shape[0], ticker_to_id[ticker], dtype=np.int64)
             )
+            y_w = np.asarray(y, dtype=np.float32)
+            if y_w.shape != (X.shape[0],):
+                raise ValueError(
+                    f"{ticker}: y shape {y_w.shape} != ({X.shape[0]},)"
+                )
+            n = X.shape[0]
+            if self.mode != "single":
+                tid = np.asarray(ticker_ids, dtype=np.int64)
+            else:
+                tid = None
+            acc = RegressionMetricsAccumulator()
+            for start in range(0, n, batch_size):
+                end = min(start + batch_size, n)
+                Xb = X[start:end]
+                yb = y_w[start:end]
+                ids_b = tid[start:end] if tid is not None else None
+                X_w = self._rows_to_lgbm_matrix(Xb, ids_b)
+                pred = model.predict(self._to_df(X_w)).astype(np.float32)
+                acc.update(yb, pred)
+            frames.append(acc.to_dataframe(ticker))
+            all_acc.merge(acc)
 
-            _, y_w = self._make_windows(X, y, ticker_ids)
-            y_pred = self.predict(X, ticker_ids, use_finetune=use_finetune)
-
-            frames.append(self._regression_metrics_df(y_w, y_pred, ticker))
-            all_y.append(y_w)
-            all_pred.append(y_pred)
-
-        frames.append(self._regression_metrics_df(
-            np.concatenate(all_y),
-            np.concatenate(all_pred),
-            "ALL",
-        ))
+        frames.append(all_acc.to_dataframe("ALL"))
         return pd.concat(frames)
 
     def plot_loss(self):

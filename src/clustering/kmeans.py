@@ -25,7 +25,6 @@ class KMeansClusterer(BaseClusterer):
 
         self._scaler: Optional[StandardScaler] = None
         self._kmeans: Optional[KMeans] = None
-        self._fitted = False
 
     def fit(self, X: np.ndarray) -> "KMeansClusterer":
         X = self._scale_fit(X)
@@ -35,26 +34,21 @@ class KMeansClusterer(BaseClusterer):
             n_init=self.n_init,
         )
         self._kmeans.fit(X)
-        self._fitted = True
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        self._check_fitted()
         return self._kmeans.predict(self._scale_transform(X))
 
     @property
     def labels_(self) -> np.ndarray:
-        self._check_fitted()
         return self._kmeans.labels_
 
     @property
     def inertia_(self) -> float:
-        self._check_fitted()
         return self._kmeans.inertia_
 
     @property
     def cluster_centers_(self) -> np.ndarray:
-        self._check_fitted()
         return self._kmeans.cluster_centers_
 
     def _scale_fit(self, X: np.ndarray) -> np.ndarray:
