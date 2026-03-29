@@ -53,7 +53,6 @@ class UMAPProjector:
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        self._check_fitted()
         X = np.asarray(X, dtype=np.float32)
         if self._scaler is not None:
             X = self._scaler.transform(X)
@@ -77,6 +76,3 @@ class UMAPProjector:
         with open(path, "rb") as f:
             return pickle.load(f)
 
-    def _check_fitted(self):
-        if self._umap is None:
-            raise RuntimeError("Сначала вызовите fit() или fit_transform().")
