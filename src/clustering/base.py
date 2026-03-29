@@ -1,6 +1,3 @@
-"""
-Базовый интерфейс кластеризаторов эмбеддингов.
-"""
 from __future__ import annotations
 
 import pickle
@@ -11,34 +8,18 @@ import numpy as np
 
 
 class BaseClusterer(ABC):
-    """
-    Единый интерфейс для всех кластеризаторов.
-
-    Все реализации обязаны:
-        fit(X)        — обучиться на train-эмбеддингах
-        predict(X)    — предсказать метки для новых точек
-        labels_       — метки, назначенные во время fit
-        cluster_sizes — размер каждого кластера
-        save / load   — сериализация через pickle
-
-    Шумовые точки (если алгоритм поддерживает) получают метку -1.
-    """
 
     @abstractmethod
-    def fit(self, X: np.ndarray) -> "BaseClusterer":
-        """X : (N, D) — эмбеддинги train."""
+    def fit(self, X: np.ndarray) -> "BaseClusterer": ...
 
     @abstractmethod
-    def predict(self, X: np.ndarray) -> np.ndarray:
-        """X : (M, D) → (M,) int — метки кластеров."""
+    def predict(self, X: np.ndarray) -> np.ndarray: ...
 
     @property
     @abstractmethod
-    def labels_(self) -> np.ndarray:
-        """Метки, назначенные во время fit."""
+    def labels_(self) -> np.ndarray: ...
 
     def cluster_sizes(self) -> dict[int, int]:
-        """Размер каждого кластера. Перегрузите при необходимости."""
         labels = self.labels_
         unique, counts = np.unique(labels, return_counts=True)
         return {int(k): int(c) for k, c in zip(unique, counts)}

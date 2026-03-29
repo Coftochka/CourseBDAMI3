@@ -1,11 +1,7 @@
-"""
-Cluster quality analysis and visualisation utilities.
-
-    from src.clustering.cluster_analysis import plot_elbow, plot_clusters_2d, cluster_stats
-"""
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -13,18 +9,12 @@ from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 
-# ── k selection ───────────────────────────────────────────────────────────────
-
 def elbow_scores(
     embeddings: np.ndarray,
     k_range: range | list[int] = range(2, 11),
     scale: bool = True,
     random_state: int = 42,
 ) -> dict[str, list]:
-    """
-    Returns inertia and silhouette scores for each k.
-    Use to pick optimal number of clusters before running the full experiment.
-    """
     X = StandardScaler().fit_transform(embeddings) if scale else embeddings
     inertias, silhouettes = [], []
 
@@ -67,8 +57,6 @@ def plot_elbow(
     return scores
 
 
-# ── 2-D visualisation ─────────────────────────────────────────────────────────
-
 def plot_clusters_2d(
     embeddings: np.ndarray,
     labels: np.ndarray,
@@ -78,7 +66,6 @@ def plot_clusters_2d(
     alpha: float = 0.4,
     s: int = 8,
 ):
-    """Project embeddings to 2D with PCA and colour by cluster label."""
     X = StandardScaler().fit_transform(embeddings) if scale else embeddings
     coords = PCA(n_components=2).fit_transform(X)
 
@@ -99,21 +86,10 @@ def plot_clusters_2d(
     plt.show()
 
 
-# ── per-cluster statistics ────────────────────────────────────────────────────
-
 def cluster_stats(
     labels: np.ndarray,
     returns: np.ndarray | None = None,
-) -> "pd.DataFrame":
-    """
-    labels  : (N,) cluster assignments
-    returns : (N,) optional array of target values (e.g. log-returns)
-
-    Returns a DataFrame with per-cluster counts and, if returns provided,
-    mean/std/median of returns.
-    """
-    import pandas as pd
-
+) -> pd.DataFrame:
     ks = np.unique(labels)
     rows = []
     for k in ks:
@@ -121,8 +97,8 @@ def cluster_stats(
         row: dict = {"cluster": int(k), "count": int(mask.sum())}
         if returns is not None:
             r = returns[mask]
-            row["return_mean"]   = float(r.mean())
-            row["return_std"]    = float(r.std())
+            row["return_mean"] = float(r.mean())
+            row["return_std"] = float(r.std())
             row["return_median"] = float(np.median(r))
         rows.append(row)
 
