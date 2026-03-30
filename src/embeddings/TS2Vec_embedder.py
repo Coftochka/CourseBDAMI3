@@ -3,7 +3,7 @@ from torch import cuda
 import torch
 
 
-class TS2VecEmbeder:
+class TS2VecEmbedder:
     def __init__(
         self,
         input_size: int,
