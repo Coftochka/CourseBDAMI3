@@ -106,6 +106,9 @@ class TorchBaseModel(BaseModel, nn.Module):
             raise ValueError(f"y shape {y.shape} != expected ({X.shape[0]},)")
 
         device = next(self.parameters()).device
+        use_amp = device.type == "cuda"
+        scaler = torch.amp.GradScaler("cuda") if use_amp else None
+
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         criterion = nn.MSELoss()
 
@@ -132,16 +135,22 @@ class TorchBaseModel(BaseModel, nn.Module):
             for xb, yb in train_loader:
                 xb, yb = xb.to(device), yb.to(device)
                 optimizer.zero_grad()
-                loss = criterion(self(xb), yb)
-                loss.backward()
-                optimizer.step()
+                with torch.amp.autocast("cuda", enabled=use_amp):
+                    loss = criterion(self(xb), yb)
+                if use_amp:
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    optimizer.step()
                 epoch_loss += loss.item() * len(xb)
                 epoch_n += len(xb)
             self.train_losses_.append(epoch_loss / epoch_n)
 
             # — validation & early stopping —
             if val_loader is not None:
-                val_loss = self._eval_loss(val_loader, criterion, device)
+                val_loss = self._eval_loss(val_loader, criterion, device, use_amp)
                 self.val_losses_.append(val_loss)
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
@@ -163,12 +172,15 @@ class TorchBaseModel(BaseModel, nn.Module):
         if X.ndim != 3:
             raise ValueError(f"X must be 3-D, got {X.ndim}-D")
         device = next(self.parameters()).device
+        use_amp = device.type == "cuda"
         self.eval()
         parts: list[np.ndarray] = []
         with torch.no_grad():
             for i in range(0, len(X), self.batch_size):
                 xb = torch.from_numpy(X[i : i + self.batch_size]).to(device)
-                parts.append(self(xb).cpu().numpy())
+                with torch.amp.autocast("cuda", enabled=use_amp):
+                    out = self(xb)
+                parts.append(out.float().cpu().numpy())
         return np.concatenate(parts)
 
     # ── loss visualisation ─────────────────────────────────────────────────────
@@ -213,13 +225,14 @@ class TorchBaseModel(BaseModel, nn.Module):
         )
         return torch.utils.data.DataLoader(ds, batch_size=self.batch_size, shuffle=shuffle)
 
-    def _eval_loss(self, loader, criterion, device) -> float:
+    def _eval_loss(self, loader, criterion, device, use_amp: bool = False) -> float:
         self.eval()
         total, n = 0.0, 0
         with torch.no_grad():
             for xb, yb in loader:
                 xb, yb = xb.to(device), yb.to(device)
-                loss = criterion(self(xb), yb)
+                with torch.amp.autocast("cuda", enabled=use_amp):
+                    loss = criterion(self(xb), yb)
                 total += loss.item() * len(xb)
                 n += len(xb)
         return total / n
