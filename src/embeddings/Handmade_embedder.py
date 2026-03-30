@@ -21,7 +21,7 @@ ATR14 = 16
 OBV = 17
 
 
-class HandmadeEmbeder:
+class HandmadeEmbedder:
     def transform(self, windows: np.ndarray) -> np.ndarray:
         close  = windows[:, :, CLOSE]
         volume = windows[:, :, VOLUME]
