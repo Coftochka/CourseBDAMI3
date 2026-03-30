@@ -1,0 +1,1 @@
+{"input_size": 18, "hidden_size": 128, "output_size": 50, "device": "cuda", "depth": 3}
