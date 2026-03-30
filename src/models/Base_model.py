@@ -12,7 +12,9 @@ Shapes:
     predict: (M,)                          — one prediction per window
 """
 
+import pickle
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Optional, List
 
 import numpy as np
@@ -44,6 +46,18 @@ class BaseModel(ABC):
     def plot_loss(self, title: str = "") -> None:
         """Plot training loss curve.  Override in subclasses that track loss."""
         pass
+
+    def save(self, path: str) -> None:
+        """Serialize the model to *path* using pickle."""
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(pickle.dumps(self))
+        print(f"Saved → {p}")
+
+    @classmethod
+    def load(cls, path: str) -> "BaseModel":
+        """Deserialize a model saved with :meth:`save`."""
+        return pickle.loads(Path(path).read_bytes())
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -177,6 +191,20 @@ class TorchBaseModel(BaseModel, nn.Module):
         plt.tight_layout()
         plt.show()
 
+    # ── save / load ───────────────────────────────────────────────────────────
+
+    def save(self, path: str) -> None:
+        """Save the full model object via torch.save (preserves weights & config)."""
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(self, p)
+        print(f"Saved → {p}")
+
+    @classmethod
+    def load(cls, path: str) -> "TorchBaseModel":
+        """Load a model saved with :meth:`save`."""
+        return torch.load(Path(path), weights_only=False)
+
     # ── internal helpers ──────────────────────────────────────────────────────
 
     def _make_loader(self, X: np.ndarray, y: np.ndarray, shuffle: bool):
@@ -195,3 +223,5 @@ class TorchBaseModel(BaseModel, nn.Module):
                 total += loss.item() * len(xb)
                 n += len(xb)
         return total / n
+
+    
