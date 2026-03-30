@@ -63,7 +63,7 @@ def run_optuna_lstm(
             num_layers=trial.suggest_int("num_layers", 1, 3),
             dropout=trial.suggest_float("dropout", 0.0, 0.4),
             epochs=trial.suggest_int("epochs", 20, 80, step=10),
-            batch_size=trial.suggest_categorical("batch_size", [32, 64, 128]),
+            batch_size=128,
             lr=trial.suggest_float("lr", 1e-4, 5e-3, log=True),
             patience=trial.suggest_int("patience", 5, 15),
         )
@@ -76,7 +76,7 @@ def run_optuna_lstm(
     p = study.best_trial.params
     best = LSTMModel(input_size=input_size, hidden_size=p["hidden_size"],
                      num_layers=p["num_layers"], dropout=p["dropout"],
-                     epochs=p["epochs"], batch_size=p["batch_size"],
+                     epochs=p["epochs"], batch_size=128,
                      lr=p["lr"], patience=p["patience"])
     best.fit(X_train, y_train, X_val=X_val, y_val=y_val)
     return best, study, _save(best, Path(save_dir) / "lstm_best.pth")
@@ -99,7 +99,7 @@ def run_optuna_gru(
             num_layers=trial.suggest_int("num_layers", 1, 3),
             dropout=trial.suggest_float("dropout", 0.0, 0.4),
             epochs=trial.suggest_int("epochs", 20, 80, step=10),
-            batch_size=trial.suggest_categorical("batch_size", [32, 64, 128]),
+            batch_size=128,
             lr=trial.suggest_float("lr", 1e-4, 5e-3, log=True),
             patience=trial.suggest_int("patience", 5, 15),
         )
@@ -112,7 +112,7 @@ def run_optuna_gru(
     p = study.best_trial.params
     best = GRUModel(input_size=input_size, hidden_size=p["hidden_size"],
                     num_layers=p["num_layers"], dropout=p["dropout"],
-                    epochs=p["epochs"], batch_size=p["batch_size"],
+                    epochs=p["epochs"], batch_size=128,
                     lr=p["lr"], patience=p["patience"])
     best.fit(X_train, y_train, X_val=X_val, y_val=y_val)
     return best, study, _save(best, Path(save_dir) / "gru_best.pth")
@@ -136,7 +136,7 @@ def run_optuna_cnn(
             kernel_size=trial.suggest_int("kernel_size", 3, 9, step=2),
             dropout=trial.suggest_float("dropout", 0.0, 0.4),
             epochs=trial.suggest_int("epochs", 20, 80, step=10),
-            batch_size=trial.suggest_categorical("batch_size", [32, 64, 128]),
+            batch_size=128,
             lr=trial.suggest_float("lr", 1e-4, 5e-3, log=True),
             patience=trial.suggest_int("patience", 5, 15),
         )
@@ -150,7 +150,7 @@ def run_optuna_cnn(
     best = CNNModel(input_size=input_size, num_filters=p["num_filters"],
                     num_layers=p["num_layers"], kernel_size=p["kernel_size"],
                     dropout=p["dropout"], epochs=p["epochs"],
-                    batch_size=p["batch_size"], lr=p["lr"], patience=p["patience"])
+                    batch_size=128, lr=p["lr"], patience=p["patience"])
     best.fit(X_train, y_train, X_val=X_val, y_val=y_val)
     return best, study, _save(best, Path(save_dir) / "cnn_best.pth")
 
@@ -176,7 +176,7 @@ def run_optuna_transformer(
             dim_feedforward=trial.suggest_int("dim_feedforward", 64, 512, step=64),
             dropout=trial.suggest_float("dropout", 0.0, 0.4),
             epochs=trial.suggest_int("epochs", 20, 80, step=10),
-            batch_size=trial.suggest_categorical("batch_size", [32, 64, 128]),
+            batch_size=128,
             lr=trial.suggest_float("lr", 1e-4, 5e-3, log=True),
             patience=trial.suggest_int("patience", 5, 15),
         )
@@ -190,7 +190,7 @@ def run_optuna_transformer(
     best = TransformerModel(input_size=input_size, d_model=p["d_model"],
                             nhead=p["nhead"], num_encoder_layers=p["num_encoder_layers"],
                             dim_feedforward=p["dim_feedforward"], dropout=p["dropout"],
-                            epochs=p["epochs"], batch_size=p["batch_size"],
+                            epochs=p["epochs"], batch_size=128,
                             lr=p["lr"], patience=p["patience"])
     best.fit(X_train, y_train, X_val=X_val, y_val=y_val)
     return best, study, _save(best, Path(save_dir) / "transformer_best.pth")
