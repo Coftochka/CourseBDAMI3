@@ -32,7 +32,7 @@ class TS2VecEmbedder:
         }, path)
 
     @classmethod
-    def load(cls, path: str) -> "TS2VecEmbeder":
+    def load(cls, path: str) -> "TS2VecEmbedder":
         ckpt = torch.load(path, weights_only=True, map_location="cpu")
         obj = cls(**ckpt["config"])
         obj.model.load_state_dict(ckpt["state_dict"])
