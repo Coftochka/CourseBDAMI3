@@ -1,6 +1,8 @@
+import json
+import os
+
 from ts2vec import TS2Vec
 from torch import cuda
-import torch
 
 
 class TS2VecEmbedder:
@@ -20,20 +22,21 @@ class TS2VecEmbedder:
 
     def fit_transform(self, X_train, n_epochs: int = 5, verbose: bool = True):
         self.model.fit(train_data=X_train, n_epochs=n_epochs, verbose=verbose)
-        return self.model.encode(X_train)
+        return self.model.encode(X_train, encoding_window='full_series')
 
     def transform(self, X):
-        return self.model.encode(X)
+        return self.model.encode(X, encoding_window='full_series')
 
     def save(self, path: str) -> None:
-        torch.save({
-            "state_dict": {k: v.cpu() for k, v in self.model.state_dict().items()},
-            "config": dict(self.config),
-        }, path)
+        os.makedirs(path, exist_ok=True)
+        self.model.save(os.path.join(path, "weights.pt"))
+        with open(os.path.join(path, "config.json"), "w") as f:
+            json.dump(self.config, f)
 
     @classmethod
     def load(cls, path: str) -> "TS2VecEmbedder":
-        ckpt = torch.load(path, weights_only=True, map_location="cpu")
-        obj = cls(**ckpt["config"])
-        obj.model.load_state_dict(ckpt["state_dict"])
+        with open(os.path.join(path, "config.json")) as f:
+            config = json.load(f)
+        obj = cls(**config)
+        obj.model.load(os.path.join(path, "weights.pt"))
         return obj
