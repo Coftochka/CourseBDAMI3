@@ -106,6 +106,9 @@
 
 // ========== ГЛАВА 2: ПЛАН ДАЛЬНЕЙШЕЙ РАБОТЫ ==========
 
-#include "chapters/chapter2.typ"
+#{include "chapters/chapter2.typ"}
 // ========== БИБЛИОГРАФИЯ ==========
+#{include "chapters/chapter3.typ"}
+
+
 #bibliography("refs.bib", title: "Список литературы", style: "ieee")
