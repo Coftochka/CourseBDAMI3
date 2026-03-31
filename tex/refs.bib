@@ -201,6 +201,182 @@
 }
 
 
+% ========== IC vs MSE и ошибки весов Марковица ==========
+
+@article{hyndman2008automatic,
+  author    = {Hyndman, Rob J. and Khandakar, Yeasmin},
+  title     = {Automatic Time Series Forecasting: The \texttt{forecast} Package for {R}},
+  journal   = {Journal of Statistical Software},
+  year      = {2008},
+  volume    = {27},
+  number    = {3},
+  pages     = {1--22},
+  doi       = {10.18637/jss.v027.i03}
+}
+
+@article{rankic2024,
+  author        = {Shi, Xiao and Liu, Yang and Chen, Weiqing and Liu, Jiang},
+  title         = {On Evaluating Loss Functions for Stock Ranking: An Empirical Analysis With Transformer Model},
+  journal       = {arXiv preprint},
+  year          = {2024},
+  eprint        = {2408.03551},
+  archiveprefix = {arXiv},
+  primaryclass  = {q-fin.ST}
+}
+
+@article{kan2007portfolio,
+  author  = {Kan, Raymond and Zhou, Guofu},
+  title   = {Optimal Portfolio Choice with Parameter Uncertainty},
+  journal = {Journal of Financial and Quantitative Analysis},
+  year    = {2007},
+  volume  = {42},
+  number  = {3},
+  pages   = {621--656},
+  doi     = {10.1017/S0022109000004129}
+}
+
+% ========== Сравнительные исследования моделей для финансовых рядов ==========
+
+@article{fischer2018deep,
+  author  = {Fischer, Thomas and Krauss, Christopher},
+  title   = {Deep learning with long short-term memory networks for financial market predictions},
+  journal = {European Journal of Operational Research},
+  year    = {2018},
+  volume  = {270},
+  number  = {2},
+  pages   = {654--669},
+  doi     = {10.1016/j.ejor.2017.11.054}
+}
+
+@article{sezer2020financial,
+  author  = {Sezer, Omer Berat and Gudelek, M. Ugur and Ozbayoglu, A. Murat},
+  title   = {Financial time series forecasting with deep learning: A systematic literature review: 2005--2019},
+  journal = {Applied Soft Computing},
+  year    = {2020},
+  volume  = {90},
+  pages   = {106181},
+  doi     = {10.1016/j.asoc.2020.106181}
+}
+
+@inproceedings{zhou2021informer,
+  author    = {Zhou, Haoyi and Zhang, Shanghang and Peng, Jieqi and Zhang, Shuai and Li, Jianxin and Xiong, Hui and Zhang, Wancai},
+  title     = {Informer: Beyond Efficient Transformer for Long Sequence Time-Series Forecasting},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2021},
+  volume    = {35},
+  number    = {12},
+  pages     = {11106--11115}
+}
+
+@article{zeng2023transformers,
+  author        = {Zeng, Ailing and Chen, Muxi and Zhang, Lei and Xu, Qiang},
+  title         = {Are Transformers Effective for Time Series Forecasting?},
+  booktitle     = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year          = {2023},
+  volume        = {37},
+  number        = {9},
+  pages         = {11121--11128},
+  eprint        = {2205.13504},
+  archiveprefix = {arXiv}
+}
+
+@article{oreshkin2020nbeats,
+  author        = {Oreshkin, Boris N. and Carpov, Dmitri and Chapados, Nicolas and Bengio, Yoshua},
+  title         = {{N-BEATS}: Neural basis expansion analysis for interpretable time series forecasting},
+  journal       = {arXiv preprint},
+  year          = {2019},
+  eprint        = {1905.10437},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.LG},
+  note          = {Published: ICLR 2020}
+}
+
+% ========== Оптимизация гиперпараметров и градиентный бустинг ==========
+
+@inproceedings{akiba2019optuna,
+  author    = {Akiba, Takuya and Sano, Shotaro and Yanase, Toshihiro and Ohta, Takeru and Koyama, Masanori},
+  title     = {Optuna: A Next-generation Hyperparameter Optimization Framework},
+  booktitle = {Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining},
+  year      = {2019},
+  pages     = {2623--2631},
+  publisher = {ACM}
+}
+
+@article{ke2017lightgbm,
+  author    = {Ke, Guolin and Meng, Qi and Finley, Thomas and Wang, Taifeng and Chen, Wei and Ma, Weidong and Ye, Qiwei and Liu, Tie-Yan},
+  title     = {{LightGBM}: A Highly Efficient Gradient Boosting Decision Tree},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2017},
+  volume    = {30}
+}
+
+@article{box1970arima,
+  author  = {Box, George E. P. and Jenkins, Gwilym M.},
+  title   = {Time Series Analysis: Forecasting and Control},
+  journal = {Holden-Day},
+  year    = {1970}
+}
+
+% ========== Кластеризация и снижение размерности ==========
+
+@article{mcinnes2018umap,
+  author        = {McInnes, Leland and Healy, John and Melville, James},
+  title         = {{UMAP}: Uniform Manifold Approximation and Projection for Dimension Reduction},
+  journal       = {arXiv preprint},
+  year          = {2018},
+  eprint        = {1802.03426},
+  archiveprefix = {arXiv},
+  primaryclass  = {stat.ML}
+}
+
+@inproceedings{campello2013hdbscan,
+  author    = {Campello, Ricardo J. G. B. and Moulavi, Davoud and Sander, J{\"o}rg},
+  title     = {Density-Based Clustering Based on Hierarchical Density Estimates},
+  booktitle = {Advances in Knowledge Discovery and Data Mining (PAKDD)},
+  year      = {2013},
+  pages     = {160--172},
+  publisher = {Springer}
+}
+
+@article{lloyd1982kmeans,
+  author  = {Lloyd, Stuart P.},
+  title   = {Least Squares Quantization in {PCM}},
+  journal = {IEEE Transactions on Information Theory},
+  year    = {1982},
+  volume  = {28},
+  number  = {2},
+  pages   = {129--137}
+}
+
+@article{rousseeuw1987silhouettes,
+  author  = {Rousseeuw, Peter J.},
+  title   = {Silhouettes: a Graphical Aid to the Interpretation and Validation of Cluster Analysis},
+  journal = {Journal of Computational and Applied Mathematics},
+  year    = {1987},
+  volume  = {20},
+  pages   = {53--65}
+}
+
+@article{calinski1974dendrite,
+  author  = {Cali{\'n}ski, Tadeusz and Harabasz, Joachim},
+  title   = {A dendrite method for cluster analysis},
+  journal = {Communications in Statistics},
+  year    = {1974},
+  volume  = {3},
+  number  = {1},
+  pages   = {1--27}
+}
+
+@inproceedings{yue2022ts2vec,
+  author    = {Yue, Zhihan and Wang, Yujing and Duan, Juanyong and Yang, Tianmeng and Huang, Congrui and Tong, Yunhai and Xu, Bixiong},
+  title     = {{TS2Vec}: Towards Universal Representation of Time Series},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  year      = {2022},
+  volume    = {36},
+  number    = {8},
+  pages     = {8980--8987}
+}
+
 % ========= Многоагентная поебень ==========
 
 @misc{TwinMarket,

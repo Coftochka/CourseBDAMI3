@@ -98,17 +98,29 @@
 #{include "chapters/annotation.typ"}
 
 // ========== ВВЕДЕНИЕ ==========
-#{include "chapters/intro.typ"}
+// #{include "chapters/intro.typ"}
 
 // ========== ГЛАВА 1: ОПИСАНИЕ ИСПОЛЬЗУЕМЫХ АЛГОРИТМОВ ==========
 
 #{include "chapters/chapter1.typ"}
 
-// ========== ГЛАВА 2: ПЛАН ДАЛЬНЕЙШЕЙ РАБОТЫ ==========
+// ========== ГЛАВА 2: РЕАЛИЗОВАННЫЕ МОДЕЛИ И ПАЙПЛАЙН ==========
 
-#{include "chapters/chapter2.typ"}
+#{include "chapters/chapter_models.typ"}
+
+// ========== ГЛАВА 3: ТРЕБОВАНИЯ К СИСТЕМЕ ==========
+
+// #{include "chapters/chapter_func_and_no_func.typ"}
+
+// ========== ГЛАВА 4: ПЛАН ДАЛЬНЕЙШЕЙ РАБОТЫ ==========
+
+// #{include "chapters/chapter2.typ"}
 // ========== БИБЛИОГРАФИЯ ==========
 #{include "chapters/chapter3.typ"}
+
+#{include "chapters/data.typ"}
+#{include "chapters/embedings.typ"}
+
 
 
 #bibliography("refs.bib", title: "Список литературы", style: "ieee")
