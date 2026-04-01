@@ -119,7 +119,7 @@
 #{include "chapters/chapter3.typ"}
 
 #{include "chapters/data.typ"}
-#{include "chapters/embedings.typ"}
+#{include "chapters/embeddings.typ"}
 
 
 
