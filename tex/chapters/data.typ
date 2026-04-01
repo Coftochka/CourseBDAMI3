@@ -1,7 +1,7 @@
 #import "../state.typ": bib_state
 #context bib_state.get()
 
-== Работа с данными
+= Работа с данными
 
 == Данные
 
