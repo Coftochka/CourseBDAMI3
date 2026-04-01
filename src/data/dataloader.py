@@ -46,8 +46,8 @@ TEST_END = DEFAULT_SPLIT.test_end
 
 
 def _project_root() -> Path:
-    # prep.py → data_analisys&prep → data → src → repo root
-    return Path(__file__).resolve().parents[3]
+    # dataloader.py → data/ → src/ → CourseBDAMI3/
+    return Path(__file__).resolve().parents[2]
 
 
 def _default_candles_root() -> Path:
