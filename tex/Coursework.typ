@@ -98,15 +98,20 @@
 #{include "chapters/annotation.typ"}
 
 // ========== ВВЕДЕНИЕ ==========
-// #{include "chapters/intro.typ"}
+#{include "chapters/intro.typ"}
+#{include "chapters/obzzzorr.typ"}
+#{include "chapters/general_pipline.typ"}
 
 // ========== ГЛАВА 1: ОПИСАНИЕ ИСПОЛЬЗУЕМЫХ АЛГОРИТМОВ ==========
 
-#{include "chapters/chapter1.typ"}
 
+#{include "chapters/data.typ"}
 // ========== ГЛАВА 2: РЕАЛИЗОВАННЫЕ МОДЕЛИ И ПАЙПЛАЙН ==========
-
+#{include "chapters/embeddings.typ"}
+#{include "chapters/cluster.typ"}
 #{include "chapters/chapter_models.typ"}
+#{include "chapters/testing.typ"}
+#{include "chapters/results.typ"}
 
 // ========== ГЛАВА 3: ТРЕБОВАНИЯ К СИСТЕМЕ ==========
 
@@ -116,10 +121,9 @@
 
 // #{include "chapters/chapter2.typ"}
 // ========== БИБЛИОГРАФИЯ ==========
-#{include "chapters/chapter3.typ"}
 
-#{include "chapters/data.typ"}
-#{include "chapters/embedings.typ"}
+
+
 
 
 
