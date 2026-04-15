@@ -25,14 +25,12 @@ try:
     _HDBSCAN_AVAILABLE = True
 except ImportError:
     _HDBSCAN_AVAILABLE = False
-    warnings.warn("hdbscan не установлен — HDBSCAN недоступен.")
 
 try:
     import umap as _umap_pkg
     _UMAP_AVAILABLE = True
 except ImportError:
     _UMAP_AVAILABLE = False
-    warnings.warn("umap-learn не установлен.")
 
 
 def _kneedle_elbow(cumvar: np.ndarray, max_k: int = 200) -> int:
@@ -64,12 +62,12 @@ def pca_analysis(
         axes[0].bar(range(1, n_show + 1), ev[:n_show],
                     color="steelblue", alpha=0.75, width=0.8)
         axes[0].axvline(thresholds[0.90], color="crimson", ls="--", lw=1.5,
-                        label=f"90% → {thresholds[0.90]} компонент")
+                        label=f"90% → {thresholds[0.90]} components")
         axes[0].axvline(elbow_k, color="darkorange", ls=":", lw=1.8,
                         label=f"elbow → {elbow_k}")
-        axes[0].set_title(f"Scree plot (первые {n_show} компонент)")
-        axes[0].set_xlabel("Компонента")
-        axes[0].set_ylabel("Объяснённая дисперсия")
+        axes[0].set_title(f"Scree plot (first {n_show} components)")
+        axes[0].set_xlabel("Component")
+        axes[0].set_ylabel("Explained variance")
         axes[0].legend(fontsize=9)
 
         axes[1].plot(range(1, len(cumvar) + 1), cumvar, lw=2, color="steelblue")
@@ -85,8 +83,8 @@ def pca_analysis(
             )
         axes[1].axvline(elbow_k, color="darkorange", ls=":", lw=1.8)
         axes[1].set_xlim(0, min(len(cumvar), 100))
-        axes[1].set_xlabel("Число компонент")
-        axes[1].set_ylabel("Накопленная дисперсия")
+        axes[1].set_xlabel("Number of components")
+        axes[1].set_ylabel("Cumulative variance")
         axes[1].set_title("Cumulative explained variance")
 
         plt.suptitle(
@@ -97,10 +95,10 @@ def pca_analysis(
         plt.tight_layout()
         plt.show()
 
-    print("PCA рекомендации:")
+    print("PCA recommendations:")
     print(f"  Elbow (kneedle): {elbow_k}")
     for t, k in thresholds.items():
-        print(f"  {int(t * 100)}% дисперсии → {k} компонент")
+        print(f"  {int(t * 100)}% variance → {k} components")
 
     return {
         "pca": pca,
@@ -139,7 +137,7 @@ class ClusterPipelineSearch:
     ):
         unknown = set(algos) - self._VALID_ALGOS
         if unknown:
-            raise ValueError(f"Неизвестные алгоритмы: {unknown}. Допустимы: {self._VALID_ALGOS}")
+            raise ValueError(f"Unknown algorithms: {unknown}. Valid: {self._VALID_ALGOS}")
         self.algos = list(algos)
 
         self.n_pca_values = list(n_pca_values)
@@ -165,7 +163,6 @@ class ClusterPipelineSearch:
 
         self.results_: Optional[pd.DataFrame] = None
         self._rows: list[dict] = []
-
 
     def run(self, X_scaled: np.ndarray, y_target: np.ndarray) -> "ClusterPipelineSearch":
         X = np.asarray(X_scaled, dtype=float)
@@ -223,7 +220,7 @@ class ClusterPipelineSearch:
                 try:
                     Z_list.append(self._fit_umap(
                         P, n_umap, n_neighbors, min_dist,
-                        seed=None, n_jobs=self.n_jobs,   # параллельный
+                        seed=None, n_jobs=self.n_jobs,
                     ))
                 except Exception as exc:
                     warnings.warn(f"UMAP(stability) failed: {exc}")
@@ -258,9 +255,8 @@ class ClusterPipelineSearch:
         self._add_composite_score()
         if self.save_path and len(self.results_):
             self.results_.to_csv(self.save_path, index=False)
-            print(f"\nРезультаты сохранены: {self.save_path}")
+            print(f"\nResults saved: {self.save_path}")
         return self
-
 
     def filtered(self) -> pd.DataFrame:
         df = self.results_
@@ -278,7 +274,7 @@ class ClusterPipelineSearch:
 
         return df[m].sort_values("composite_score", ascending=False)
 
-    def top_k(self, k: int = 3, filtered: bool = True) -> pd.DataFrame:
+    def top_k(self, k: int = 3, filtered: bool = True) -> pd.DataFrame: 
         cols = [
             "rank", "algo",
             "n_pca", "n_neighbors", "min_dist", "n_components_umap",
@@ -302,11 +298,11 @@ class ClusterPipelineSearch:
     def summary(self) -> None:
         df = self.results_
         if df is None or len(df) == 0:
-            print("Нет результатов.")
+            print("No results.")
             return
         f = self.filtered()
-        print(f"Всего конфигураций: {len(df)}")
-        print(f"Прошли жёсткие фильтры: {len(f)}")
+        print(f"Total configurations: {len(df)}")
+        print(f"Passed hard filters: {len(f)}")
         if len(df):
             print(f"\nSilhouette — min: {df['silhouette'].min():.4f}  "
                   f"max: {df['silhouette'].max():.4f}  "
@@ -316,7 +312,6 @@ class ClusterPipelineSearch:
             print(f"Noise ratio (HDBSCAN) — "
                   f"min: {df.loc[df['algo']=='hdbscan','noise_ratio'].min():.3f}  "
                   f"max: {df.loc[df['algo']=='hdbscan','noise_ratio'].max():.3f}")
-
 
     @staticmethod
     def _fit_umap(
@@ -328,7 +323,7 @@ class ClusterPipelineSearch:
         n_jobs: int = 1,
     ) -> np.ndarray:
         if not _UMAP_AVAILABLE:
-            raise ImportError("umap-learn не установлен.")
+            raise ImportError("umap-learn is not installed.")
         reducer = _umap_pkg.UMAP(
             n_components=n_components,
             n_neighbors=n_neighbors,
@@ -358,7 +353,7 @@ class ClusterPipelineSearch:
                 n_init=10,
             )
             return np.asarray(km.fit_predict(Z), dtype=int)
-        raise ValueError(f"Неизвестный алгоритм: {algo}")
+        raise ValueError(f"Unknown algorithm: {algo}")
 
     def _stability_ari(
         self,
@@ -383,7 +378,6 @@ class ClusterPipelineSearch:
         return float(np.mean(aris))
 
     def _downstream_rmse(self, labels: np.ndarray, y: np.ndarray) -> float:
-        """RMSE Ridge-регрессии cluster_label → y_target (one-hot features)."""
         mask = labels != -1
         if mask.sum() == 0:
             return float(np.sqrt(np.mean((y - y.mean()) ** 2)))

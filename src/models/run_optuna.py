@@ -1,14 +1,3 @@
-"""
-Optuna hyperparameter search for all models, optimising IC on validation set.
-
-Each run_optuna_<model>() returns (best_model, study, save_path).
-
-Usage
------
-    from models.run_optuna import run_optuna_lstm
-    model, study, path = run_optuna_lstm(X_train, y_train, X_val, y_val, n_trials=40)
-    print(f"Best IC={study.best_value:.4f}  saved → {path}")
-"""
 from __future__ import annotations
 
 

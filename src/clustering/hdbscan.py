@@ -11,60 +11,6 @@ from .base import BaseClusterer
 
 
 class HDBSCANClusterer(BaseClusterer):
-    """
-    Тонкая обёртка над ``hdbscan.HDBSCAN``, совместимая с ``BaseClusterer``.
-
-    Поддерживает все параметры оригинальной библиотеки.
-    Дополнительный параметр ``scale`` включает StandardScaler перед fit/predict.
-
-    Parameters
-    ----------
-    min_cluster_size : int
-        Минимальный размер кластера. Основной параметр чувствительности.
-    min_samples : int or None
-        Число соседей для расчёта плотности ядра. None → равно min_cluster_size.
-    cluster_selection_epsilon : float
-        Минимальное расстояние между кластерами (упрощает мелкую кластеризацию).
-    cluster_selection_persistence : float
-        Минимальная «жизнь» кластера в дереве. Фильтрует нестабильные кластеры.
-    max_cluster_size : int
-        Ограничение сверху на размер кластера (0 = без ограничений).
-    metric : str
-        Метрика расстояния ('euclidean', 'cosine', 'manhattan', …).
-    alpha : float
-        Коэффициент для mutual reachability distance. Обычно 1.0.
-    p : float or None
-        Степень для метрики Minkowski (только при metric='minkowski').
-    algorithm : {'best', 'generic', 'prims_kdtree', 'prims_balltree', 'boruvka_kdtree', 'boruvka_balltree'}
-        Алгоритм построения минимального остовного дерева.
-    leaf_size : int
-        Размер листа для KD/Ball-tree.
-    approx_min_span_tree : bool
-        Использовать приближённое MST (быстрее, чуть менее точно).
-    gen_min_span_tree : bool
-        Сохранить MST в атрибуте minimum_spanning_tree_.
-    core_dist_n_jobs : int
-        Число параллельных потоков для расчёта расстояний ядра.
-    cluster_selection_method : {'eom', 'leaf'}
-        'eom' — Excess of Mass (по умолчанию, лучше для переменной плотности).
-        'leaf' — выбирает листья дерева (много мелких равных кластеров).
-    allow_single_cluster : bool
-        Разрешить результат из одного кластера.
-    prediction_data : bool
-        Вычислить доп. структуры для approximate_predict / membership_vector.
-    branch_detection_data : bool
-        Данные для обнаружения ветвей внутри кластеров.
-    match_reference_implementation : bool
-        Строгое соответствие эталонной реализации (медленнее).
-    cluster_selection_epsilon_max : float
-        Верхняя граница epsilon при cluster_selection_method='eom'.
-    scale : bool
-        Применять StandardScaler до fit/predict (удобно, если данные не нормированы).
-    **kwargs
-        Дополнительные аргументы, передаваемые напрямую в hdbscan.HDBSCAN
-        (например, metric_params для кастомных метрик).
-    """
-
     def __init__(
         self,
         min_cluster_size: int = 50,
@@ -114,7 +60,6 @@ class HDBSCANClusterer(BaseClusterer):
         self._scaler: Optional[StandardScaler] = None
         self._hdbscan: Optional[_HDBSCAN] = None
 
-    # ── fit / predict ──────────────────────────────────────────────────────────
 
     def fit(self, X: np.ndarray) -> "HDBSCANClusterer":
         X = self._scale_fit(X)
@@ -144,17 +89,14 @@ class HDBSCANClusterer(BaseClusterer):
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        """Мягкое предсказание через approximate_predict (требует prediction_data=True)."""
         X = self._scale_transform(X)
         labels, _ = approximate_predict(self._hdbscan, X)
         return np.asarray(labels, dtype=np.int64)
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        """Вероятности принадлежности к кластерам (требует prediction_data=True)."""
         X = self._scale_transform(X)
         return np.asarray(membership_vector(self._hdbscan, X))
 
-    # ── properties ─────────────────────────────────────────────────────────────
 
     @property
     def labels_(self) -> np.ndarray:
@@ -162,7 +104,6 @@ class HDBSCANClusterer(BaseClusterer):
 
     @property
     def probabilities_(self) -> np.ndarray:
-        """Мягкие вероятности принадлежности для обучающих точек."""
         return np.asarray(self._hdbscan.probabilities_)
 
     @property
@@ -175,16 +116,12 @@ class HDBSCANClusterer(BaseClusterer):
         return float((labels == -1).sum() / len(labels))
 
     @property
-    def outlier_scores_(self) -> np.ndarray:
-        """GLOSH-оценка выбросов (чем выше — тем более выброс)."""
+    def outlier_scores_(self) -> np.ndarray:    
         return np.asarray(self._hdbscan.outlier_scores_)
 
     @property
     def minimum_spanning_tree_(self):
-        """MST как объект hdbscan (только при gen_min_span_tree=True)."""
         return self._hdbscan.minimum_spanning_tree_
-
-    # ── scaling helpers ────────────────────────────────────────────────────────
 
     def _scale_fit(self, X: np.ndarray) -> np.ndarray:
         if self.scale:

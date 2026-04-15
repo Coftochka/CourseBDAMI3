@@ -1,17 +1,3 @@
-"""
-Abstract base classes for windowed time-series regression models.
-
-Interface contract (all models):
-    model.fit(X_train, y_train, X_val=None, y_val=None) -> None
-    model.predict(X) -> np.ndarray
-    model.plot_loss(title="") -> None
-
-Shapes:
-    X      : (N, seq_len, num_features)   — 3-D tensor of windowed features
-    y      : (N,)                          — scalar target per window
-    predict: (M,)                          — one prediction per window
-"""
-
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -24,7 +10,6 @@ from torch import nn
 
 
 class BaseModel(ABC):
-    """Minimal abstract interface shared by all regression models."""
 
     @abstractmethod
     def fit(
@@ -41,11 +26,9 @@ class BaseModel(ABC):
         ...
 
     def plot_loss(self, title: str = "") -> None:
-        """Plot training loss curve.  Override in subclasses that track loss."""
         pass
 
     def save(self, path: str) -> None:
-        """Serialize the model to *path* using pickle."""
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(pickle.dumps(self))
@@ -53,28 +36,10 @@ class BaseModel(ABC):
 
     @classmethod
     def load(cls, path: str) -> "BaseModel":
-        """Deserialize a model saved with :meth:`save`."""
         return pickle.loads(Path(path).read_bytes())
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Shared base for all PyTorch sequence models (LSTM, GRU, CNN, Transformer)
-# ──────────────────────────────────────────────────────────────────────────────
-
 class TorchBaseModel(BaseModel, nn.Module):
-    """
-    Common training / inference loop for PyTorch models.
-
-    Subclass contract:
-        1. Call ``nn.Module.__init__(self)`` in your ``__init__``.
-        2. Set attributes: ``self.epochs``, ``self.batch_size``,
-           ``self.lr``, ``self.patience``.
-        3. Define ``forward(x: Tensor) -> Tensor``
-           mapping (batch, seq_len, features) → (batch,).
-        4. Call ``self.to(self._resolve_device(device))`` at the end of __init__.
-    """
-
-    # ── device helper ─────────────────────────────────────────────────────────
 
     @staticmethod
     def _resolve_device(device: Optional[str] = None) -> torch.device:
@@ -85,8 +50,6 @@ class TorchBaseModel(BaseModel, nn.Module):
         if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             return torch.device("mps")
         return torch.device("cpu")
-
-    # ── fit ────────────────────────────────────────────────────────────────────
 
     def fit(
         self,
@@ -123,7 +86,6 @@ class TorchBaseModel(BaseModel, nn.Module):
         self.val_losses_: List[float] = []
 
         for _ in range(self.epochs):
-            # — train —
             self.train()
             epoch_loss, epoch_n = 0.0, 0
             for xb, yb in train_loader:
@@ -136,7 +98,6 @@ class TorchBaseModel(BaseModel, nn.Module):
                 epoch_n += len(xb)
             self.train_losses_.append(epoch_loss / epoch_n)
 
-            # — validation & early stopping —
             if val_loader is not None:
                 val_loss = self._eval_loss(val_loader, criterion, device)
                 self.val_losses_.append(val_loss)
@@ -153,7 +114,6 @@ class TorchBaseModel(BaseModel, nn.Module):
             self.load_state_dict(best_state)
             self.to(device)
 
-    # ── predict ───────────────────────────────────────────────────────────────
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         X = np.asarray(X, dtype=np.float32)
@@ -168,10 +128,8 @@ class TorchBaseModel(BaseModel, nn.Module):
                 parts.append(self(xb).cpu().numpy())
         return np.concatenate(parts)
 
-    # ── loss visualisation ─────────────────────────────────────────────────────
 
     def plot_loss(self, title: str = "") -> None:
-        """Plot train (and optionally val) loss curves recorded during fit()."""
         import matplotlib.pyplot as plt
 
         if not getattr(self, "train_losses_", None):
@@ -188,21 +146,15 @@ class TorchBaseModel(BaseModel, nn.Module):
         plt.tight_layout()
         plt.show()
 
-    # ── save / load ───────────────────────────────────────────────────────────
-
     def save(self, path: str) -> None:
-        """Save the full model object via torch.save (preserves weights & config)."""
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         torch.save(self, p)
         print(f"Saved → {p}")
 
     @classmethod
-    def load(cls, path: str) -> "TorchBaseModel":
-        """Load a model saved with :meth:`save`."""
+    def load(cls, path: str) -> "TorchBaseModel":   
         return torch.load(Path(path), weights_only=False)
-
-    # ── internal helpers ──────────────────────────────────────────────────────
 
     def _make_loader(self, X: np.ndarray, y: np.ndarray, shuffle: bool):
         ds = torch.utils.data.TensorDataset(

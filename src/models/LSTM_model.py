@@ -5,7 +5,6 @@ import torch
 
 
 class LSTMModel(TorchBaseModel):
-    """LSTM regression model for windowed time-series."""
 
     def __init__(
         self,
@@ -37,7 +36,6 @@ class LSTMModel(TorchBaseModel):
         self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, seq_len, input_size) → (batch,)"""
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
         out, _ = self.lstm(x, (h0, c0))

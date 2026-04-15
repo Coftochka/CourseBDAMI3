@@ -17,7 +17,6 @@ def _kmeans_metrics(
     k: int,
     random_state: int,
 ) -> tuple[float, float, float, float]:
-    """KMeans + все метрики для заданного k."""
     km = KMeans(n_clusters=k, random_state=random_state, n_init=10)
     labels = km.fit_predict(X)
     if k > 1:
@@ -36,14 +35,6 @@ def elbow_scores(
     random_state: int = 42,
     n_jobs: int | None = -1,
 ) -> dict[str, list]:
-    """
-    Возвращает inertia, silhouette, calinski_harabasz, davies_bouldin для каждого k.
-
-    Parameters
-    ----------
-    n_jobs : int or None
-        ``-1`` — все CPU; ``1`` / ``None`` — последовательно.
-    """
     X = StandardScaler().fit_transform(embeddings) if scale else np.asarray(
         embeddings, dtype=np.float64
     )
@@ -73,10 +64,6 @@ def elbow_scores(
 
 
 def _elbow_k_index(ks: list | np.ndarray, inertias: list | np.ndarray) -> int:
-    """
-    Индекс k с «локтем»: максимальное расстояние точки (k, inertia) от хорды
-    первой и последней точки в нормированных координатах.
-    """
     k_arr = np.asarray(ks, dtype=float)
     y_arr = np.asarray(inertias, dtype=float)
     n = len(k_arr)
@@ -100,15 +87,6 @@ def plot_elbow(
     figsize: tuple = (16, 4),
     n_jobs: int | None = -1,
 ):
-    """
-    Строит три графика: Elbow (inertia), Silhouette, Calinski-Harabasz.
-
-    Почему три метрики:
-    - Silhouette bias к k=2 на непрерывных распределениях (финансовые данные).
-    - Calinski-Harabasz = between/within variance ratio, менее bias.
-    - Elbow (inertia) — геометрический ориентир.
-    Принимай k по согласию хотя бы двух метрик.
-    """
     scores = elbow_scores(embeddings, k_range, scale, random_state, n_jobs=n_jobs)
     ks       = scores["k"]
     inertias = scores["inertia"]
@@ -129,7 +107,6 @@ def plot_elbow(
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=figsize)
 
-    # ── Elbow ────────────────────────────────────────────────────────────────
     ax1.plot(ks, inertias, marker="o", color="C0")
     ax1.scatter([k_elbow], [inertias[i_elbow]], s=180, c="crimson", marker="*",
                 zorder=3, edgecolors="darkred", lw=1.2, label=f"elbow k={k_elbow}")
@@ -137,7 +114,6 @@ def plot_elbow(
     ax1.set(xlabel="k", ylabel="Inertia (WCSS)", title="Elbow curve")
     ax1.grid(alpha=0.3); ax1.legend(fontsize=9)
 
-    # ── Silhouette ───────────────────────────────────────────────────────────
     ax2.plot(ks, sils, marker="o", color="C1")
     if i_sil is not None:
         ax2.scatter([k_sil], [sils[i_sil]], s=180, c="forestgreen", marker="*",
@@ -148,7 +124,6 @@ def plot_elbow(
     ax2.set(xlabel="k", ylabel="Silhouette", title="Silhouette  (bias→k=2)")
     ax2.grid(alpha=0.3)
 
-    # ── Calinski-Harabasz ────────────────────────────────────────────────────
     ax3.plot(ks, chs, marker="o", color="C2")
     if i_ch is not None:
         ax3.scatter([k_ch], [chs[i_ch]], s=180, c="darkorange", marker="*",

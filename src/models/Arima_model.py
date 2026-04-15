@@ -1,15 +1,3 @@
-"""
-ARIMA regression model adapted for the windowed interface.
-
-fit(X, y):
-    X : (N, seq_len, F) or (N, seq_len) — uses the first feature column.
-    Determines ARIMA order (optionally via grid search on AIC).
-
-predict(X):
-    For each window, fits a small ARIMA on the window values (first feature)
-    and forecasts one step ahead.
-"""
-
 import warnings
 from typing import Optional, Tuple
 
@@ -20,7 +8,6 @@ from .Base_model import BaseModel
 
 
 class ArimaModel(BaseModel):
-    """Per-window ARIMA forecaster."""
 
     def __init__(
         self,
@@ -43,18 +30,15 @@ class ArimaModel(BaseModel):
         self._order: Tuple[int, int, int] = (p, d, q)
         self._fitted = False
 
-    # ── helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _extract_series(X: np.ndarray) -> np.ndarray:
-        """(N, seq_len, F) or (N, seq_len) → (N, seq_len) using first feature."""
         X = np.asarray(X, dtype=np.float64)
         if X.ndim == 3:
             X = X[:, :, 0]
         return X
 
     def _grid_search(self, series: np.ndarray) -> Tuple[int, int, int]:
-        """Find best (p, d, q) by AIC on a single representative series."""
         best_aic = np.inf
         best_order = (1, self.d, 1)
         for p in range(self.p_max + 1):
@@ -72,7 +56,6 @@ class ArimaModel(BaseModel):
                     continue
         return best_order
 
-    # ── public API ────────────────────────────────────────────────────────────
 
     def fit(
         self,
@@ -84,7 +67,6 @@ class ArimaModel(BaseModel):
         series_all = self._extract_series(X)
 
         if self.auto_order:
-            # Use the first training window to find optimal order
             sample = series_all[0]
             self._order = self._grid_search(sample)
         else:
@@ -106,6 +88,5 @@ class ArimaModel(BaseModel):
                     fc = model.forecast(steps=1)
                     preds.append(float(fc.iloc[0]))
             except Exception:
-                # Fallback: predict last value (naive forecast)
                 preds.append(float(window[-1]))
         return np.array(preds, dtype=np.float32)
