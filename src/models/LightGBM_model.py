@@ -5,11 +5,6 @@ import lightgbm as lgb
 
 
 class LightGBMModel(BaseModel):
-    """
-    LightGBM regression model for windowed time-series.
-
-    Internally flattens X from (N, seq_len, num_features) → (N, seq_len * num_features).
-    """
 
     def __init__(
         self,
@@ -38,11 +33,9 @@ class LightGBMModel(BaseModel):
         self.early_stopping_rounds = early_stopping_rounds
         self._model: Optional[lgb.LGBMRegressor] = None
 
-    # ── helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _flatten(X: np.ndarray) -> np.ndarray:
-        """(N, seq_len, F) → (N, seq_len*F).  Already-2D arrays pass through."""
         X = np.asarray(X, dtype=np.float32)
         if X.ndim == 3:
             return X.reshape(X.shape[0], -1)
@@ -63,7 +56,6 @@ class LightGBMModel(BaseModel):
             verbose=-1,
         )
 
-    # ── public API ────────────────────────────────────────────────────────────
 
     def fit(
         self,
@@ -96,7 +88,6 @@ class LightGBMModel(BaseModel):
 
         self._model.fit(X_flat, y, **fit_params)
 
-        # Store loss history
         res = self._model.evals_result_
         self.train_losses_: list[float] = list(res.get("train", {}).get("l2", []))
         self.val_losses_: list[float] = list(res.get("valid", {}).get("l2", []))
@@ -107,7 +98,6 @@ class LightGBMModel(BaseModel):
         return self._model.predict(X_flat).astype(np.float32)
 
     def plot_loss(self, title: str = "") -> None:
-        """Plot LightGBM train/val loss curves."""
         import matplotlib.pyplot as plt
 
         if not getattr(self, "train_losses_", None):

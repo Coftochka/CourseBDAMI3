@@ -5,7 +5,6 @@ import torch
 
 
 class GRUModel(TorchBaseModel):
-    """GRU regression model for windowed time-series."""
 
     def __init__(
         self,
@@ -37,7 +36,6 @@ class GRUModel(TorchBaseModel):
         self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, seq_len, input_size) → (batch,)"""
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
         out, _ = self.gru(x, h0)
         return self.fc(out[:, -1, :]).squeeze(-1)

@@ -23,7 +23,6 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerModel(TorchBaseModel):
-    """Transformer-encoder regression model for windowed time-series."""
 
     def __init__(
         self,
@@ -61,7 +60,6 @@ class TransformerModel(TorchBaseModel):
         self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, seq_len, input_size) → (batch,)"""
         x = self.input_proj(x)
         x = self.pos_enc(x)
         x = self.encoder(x)

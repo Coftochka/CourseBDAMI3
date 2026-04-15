@@ -1,28 +1,4 @@
-"""
-ClusterAnalyzer — визуализация и интерпретация кластеров временных рядов.
 
-Интерфейс:
-    analyzer = ClusterAnalyzer(
-        labels      = labels,           # (N,) int, -1 = шум (HDBSCAN)
-        windows     = X_windows,        # (N, seq_len, n_features) опционально
-        embeddings  = Z_umap,           # (N, d) опционально
-        timestamps  = timestamps,       # (N,) pd.Timestamp опционально
-        tickers     = tickers,          # (N,) str опционально
-        close_idx   = 3,                # индекс close в windows
-        cluster_names = {0: "Uptrend", 1: "Panic"},  # опционально
-    )
-
-    df   = analyzer.cluster_metrics()                 # Silhouette / DB / CH / noise%
-    fig1 = analyzer.plot_embeddings_2d()           # scatter кластеров в 2D
-    fig2 = analyzer.plot_mean_window_profiles()    # средний профиль close ± std
-    fig3 = analyzer.plot_cluster_stats()           # return / vol / skew / size
-    fig4 = analyzer.plot_feature_heatmap()         # z-score медиан признаков
-    fig5 = analyzer.plot_returns_distribution()    # violin + box по кластерам
-    fig6 = analyzer.plot_temporal_distribution()   # регимы по времени
-    fig7 = analyzer.plot_transition_heatmap()      # матрица переходов
-
-    figs = analyzer.run_all(embeddings_2d=z2)      # метрики + все графики сразу
-"""
 from __future__ import annotations
 
 import warnings
@@ -40,7 +16,6 @@ from sklearn.metrics import (
     silhouette_score,
 )
 
-# ── visual constants ───────────────────────────────────────────────────────────
 _BG = "#ffffff"
 _PANEL = "#f6f8fa"
 _GRID = "#d0d7de"
@@ -75,33 +50,8 @@ def _cluster_palette(n: int) -> list:
     return [cmap(i) for i in range(n)]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-
 
 class ClusterAnalyzer:
-    """
-    Визуализация и интерпретация кластеров скользящих окон.
-
-    Parameters
-    ----------
-    labels : array-like, shape (N,)
-        Метки кластеров. -1 = шум (HDBSCAN).
-    windows : np.ndarray, shape (N, seq_len, n_features), optional
-        Сырые окна фичей. Нужны для графиков профилей и возвратов.
-    embeddings : np.ndarray, shape (N, d), optional
-        Латентные эмбеддинги (UMAP, PCA…). Нужны для scatter 2D.
-    timestamps : array-like of pd.Timestamp, length N, optional
-        Дата окончания каждого окна. Нужна для временных графиков.
-    tickers : array-like of str, length N, optional
-        Тикер каждого окна. Нужен для Gantt и матрицы переходов.
-    close_idx : int
-        Индекс колонки close в `windows`. По умолчанию 3.
-    feature_names : list[str], optional
-        Имена фичей в `windows` (для подписей).
-    cluster_names : dict[int, str], optional
-        Пользовательские имена кластеров, напр. {0: "Uptrend", 1: "Panic"}.
-    """
-
     def __init__(
         self,
         labels: np.ndarray,
@@ -133,7 +83,6 @@ class ClusterAnalyzer:
             cid: palette[i] for i, cid in enumerate(self._clusters)
         }
 
-    # ── helpers ────────────────────────────────────────────────────────────────
 
     def _label(self, cid: int) -> str:
         name = self._custom_names.get(cid)
@@ -156,10 +105,6 @@ class ClusterAnalyzer:
             ret = np.where(first != 0, last / first - 1.0, np.nan)
         return ret
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 1. 2-D Embedding Scatter
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_embeddings_2d(
         self,
         embeddings_2d: Optional[np.ndarray] = None,
@@ -170,18 +115,6 @@ class ClusterAnalyzer:
         sample_size: Optional[int] = 15_000,
         title: str = "Cluster Embeddings (2D)",
     ) -> plt.Figure:
-        """
-        Scatter-plot эмбеддингов в 2D, раскрашенный по кластерам.
-
-        Parameters
-        ----------
-        embeddings_2d : np.ndarray (N, 2), optional
-            Готовые 2D-координаты. Если None — проецирует self.embeddings.
-        method : {'umap', 'tsne', 'pca'}
-            Метод проекции когда embeddings_2d не задан.
-        sample_size : int or None
-            Максимальное число точек (для скорости).
-        """
         if embeddings_2d is not None:
             E2 = np.asarray(embeddings_2d, dtype=float)
         elif self.embeddings is not None:
@@ -269,25 +202,11 @@ class ClusterAnalyzer:
         from sklearn.decomposition import PCA
         return PCA(n_components=2, random_state=42).fit_transform(X)
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 2. Mean Window Profiles
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_mean_window_profiles(
         self,
         normalize: bool = True,
         max_cols: int = 3,
     ) -> plt.Figure:
-        """
-        Средний профиль нормированного close ± std для каждого кластера.
-
-        Parameters
-        ----------
-        normalize : bool
-            Min-max нормировать каждое окно в [0, 1] перед усреднением.
-        max_cols : int
-            Число колонок в сетке subplots.
-        """
         close = self._close()
         n_c = len(self._clusters)
         ncols = min(max_cols, n_c)
@@ -322,7 +241,6 @@ class ClusterAnalyzer:
             ax.fill_between(x, mean - std, mean + std, color=color, alpha=_ALPHA_FILL)
             ax.plot(x, mean, color=color, lw=2.5, zorder=3)
 
-            # Trend arrow
             delta = mean[-1] - mean[0]
             if abs(delta) < 0.05:
                 arrow = "→"
@@ -346,7 +264,6 @@ class ClusterAnalyzer:
             ax.set_xlabel("шаг окна", fontsize=8)
             ax.set_ylabel("norm close" if normalize else "close", fontsize=8)
 
-            # Highlight start / end
             ax.axvline(0, color=color, lw=0.8, ls="--", alpha=0.4)
             ax.axvline(T - 1, color=color, lw=0.8, ls="--", alpha=0.4)
 
@@ -360,14 +277,7 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 3. Cluster Statistics
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_cluster_stats(self) -> plt.Figure:
-        """
-        2×2 barplot: средний return, волатильность, скewness, размер кластера.
-        """
         close = self._close()
         returns = self._window_returns()
 
@@ -431,17 +341,7 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 4. Feature Median Heatmap
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_feature_heatmap(self) -> plt.Figure:
-        """
-        Тепловая карта z-score медиан признаков по кластерам (последний шаг окна).
-
-        Требуются ``windows`` и ``feature_names``.
-        Аннотация ячеек = реальная медиана, цвет = z-score по столбцу.
-        """
         if self.windows is None:
             raise ValueError("windows обязателен для plot_feature_heatmap.")
         if self.feature_names is None:
@@ -491,14 +391,7 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 5. Return Distributions
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_returns_distribution(self) -> plt.Figure:
-        """
-        Violin + boxplot распределения returns по кластерам.
-        """
         returns = self._window_returns()
 
         rows = []
@@ -544,31 +437,12 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 6. Temporal Distribution
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_temporal_distribution(
         self,
         selected_tickers: Optional[list[str]] = None,
         max_tickers: int = 8,
         aggregate: bool = False,
     ) -> plt.Figure:
-        """
-        Временное распределение кластеров.
-
-        Если tickers заданы — Gantt-стрип на тикер.
-        Если aggregate=True или tickers не заданы — stacked area долей.
-
-        Parameters
-        ----------
-        selected_tickers : list[str], optional
-            Конкретные тикеры для Gantt. По умолчанию топ max_tickers по числу окон.
-        max_tickers : int
-            Максимум тикеров в Gantt.
-        aggregate : bool
-            Рисовать stacked area вместо Gantt.
-        """
         if self.timestamps is None:
             raise ValueError("timestamps обязателен для temporal plot.")
 
@@ -681,15 +555,7 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 7. Transition Heatmap
-    # ══════════════════════════════════════════════════════════════════════════
-
     def plot_transition_heatmap(self) -> plt.Figure:
-        """
-        Нормированная по строкам матрица переходов P[i → j].
-        Диагональ (self-persistence) выделена другим цветом.
-        """
         counts = pd.DataFrame(
             0.0, index=self._clusters, columns=self._clusters
         )
@@ -725,7 +591,6 @@ class ClusterAnalyzer:
 
         mask_diag = np.eye(n, dtype=bool)
 
-        # Off-diagonal: magma
         sns.heatmap(
             prob, ax=ax,
             cmap="YlOrRd",
@@ -735,7 +600,6 @@ class ClusterAnalyzer:
             cbar_kws={"label": "вероятность перехода", "shrink": 0.8},
             mask=mask_diag,
         )
-        # Diagonal: green accent (self-persistence)
         diag_df = pd.DataFrame(
             np.where(mask_diag, prob.values, np.nan),
             index=prob.index, columns=prob.columns,
@@ -760,7 +624,6 @@ class ClusterAnalyzer:
         plt.xticks(rotation=35, ha="right")
         plt.yticks(rotation=0)
 
-        # Colorbar styling
         cbar = ax.collections[0].colorbar
         if cbar:
             cbar.ax.yaxis.set_tick_params(color=_TEXT, labelsize=8)
@@ -770,35 +633,11 @@ class ClusterAnalyzer:
         plt.tight_layout()
         return fig
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # Cluster Quality Metrics
-    # ══════════════════════════════════════════════════════════════════════════
-
     def cluster_metrics(
         self,
         X: Optional[np.ndarray] = None,
         sample_size: Optional[int] = 50_000,
     ) -> pd.DataFrame:
-        """
-        Вычислить метрики качества кластеризации.
-
-        Шумовые точки (label == -1) исключаются — корректно работает как для
-        HDBSCAN, так и для K-Means (у которого шума нет).
-
-        Parameters
-        ----------
-        X : np.ndarray (N, d), optional
-            Признаковое пространство для метрик. Если None — используется
-            ``self.embeddings``; если и оно None — flatten ``self.windows``.
-        sample_size : int or None
-            Ограничение числа точек для Silhouette (O(n²)); остальные метрики
-            считаются по полной выборке.
-
-        Returns
-        -------
-        pd.DataFrame с колонками: metric, value, note
-        """
-        # --- выбираем пространство ---
         if X is not None:
             X_base = np.asarray(X, dtype=float)
         elif self.embeddings is not None:
@@ -810,7 +649,6 @@ class ClusterAnalyzer:
                 "Нужен хотя бы один из: X, self.embeddings, self.windows."
             )
 
-        # --- исключаем шум ---
         mask = self.labels != -1
         X_valid = X_base[mask]
         y_valid = self.labels[mask]
@@ -827,7 +665,6 @@ class ClusterAnalyzer:
             ]
             return pd.DataFrame(rows)
 
-        # --- Silhouette с опциональным сэмплингом ---
         if sample_size and n_valid > sample_size:
             rng = np.random.default_rng(42)
             idx = rng.choice(n_valid, sample_size, replace=False)
@@ -876,10 +713,6 @@ class ClusterAnalyzer:
         ]
         return pd.DataFrame(rows).set_index("metric")
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # run_all
-    # ══════════════════════════════════════════════════════════════════════════
-
     def run_all(
         self,
         embeddings_2d: Optional[np.ndarray] = None,
@@ -888,23 +721,6 @@ class ClusterAnalyzer:
         max_tickers: int = 8,
         aggregate_temporal: bool = False,
     ) -> dict[str, Optional[plt.Figure]]:
-        """
-        Запустить метрики и все доступные визуализации.
-
-        Parameters
-        ----------
-        embeddings_2d : np.ndarray (N, 2), optional
-            Готовые 2D-координаты для scatter-plot.
-        X_metrics : np.ndarray (N, d), optional
-            Пространство для расчёта метрик качества. Если None —
-            используется ``self.embeddings`` или flatten ``self.windows``.
-
-        Returns
-        -------
-        dict с ключами:
-            metrics, embeddings_2d, mean_profiles, stats, feature_heatmap,
-            returns_dist, temporal, transition
-        """
         figs: dict[str, Optional[plt.Figure]] = {}
         sep = "═" * 58
 
@@ -914,11 +730,10 @@ class ClusterAnalyzer:
               f" · {(~self._valid).sum():,} шум")
         print(sep)
 
-        # 0. Metrics
         try:
             df_metrics = self.cluster_metrics(X=X_metrics)
             figs["metrics"] = df_metrics
-            print("\n── Метрики качества кластеризации ──────────────────────")
+            print("\nМетрики качества кластеризации")
             try:
                 from IPython.display import display
                 display(df_metrics)
@@ -928,7 +743,6 @@ class ClusterAnalyzer:
             print(f"  Метрики — ошибка: {exc}")
             figs["metrics"] = None
 
-        # 1. Embeddings 2D
         if embeddings_2d is not None or self.embeddings is not None:
             print("\n[1/7] 2D scatter эмбеддингов…")
             figs["embeddings_2d"] = self.plot_embeddings_2d(embeddings_2d=embeddings_2d)
@@ -936,7 +750,6 @@ class ClusterAnalyzer:
             print("\n[1/7] 2D scatter — пропущен (нет embeddings)")
             figs["embeddings_2d"] = None
 
-        # 2–5. Window-based plots
         if self.windows is not None:
             print("[2/7] Средние профили окон…")
             figs["mean_profiles"] = self.plot_mean_window_profiles()
@@ -955,7 +768,6 @@ class ClusterAnalyzer:
             figs["mean_profiles"] = figs["stats"] = None
             figs["feature_heatmap"] = figs["returns_dist"] = None
 
-        # 6. Temporal
         if self.timestamps is not None:
             print("[6/7] Временное распределение…")
             figs["temporal"] = self.plot_temporal_distribution(
@@ -967,11 +779,10 @@ class ClusterAnalyzer:
             print("[6/7] Временное — пропущен (нет timestamps)")
             figs["temporal"] = None
 
-        # 7. Transitions
         print("[7/7] Матрица переходов…")
         figs["transition"] = self.plot_transition_heatmap()
 
         print(f"\n{sep}")
-        print("  Готово. Фигуры доступны в возвращённом словаре.")
+        print("Готово")
         print(sep)
         return figs

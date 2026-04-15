@@ -1,25 +1,3 @@
-"""
-ClusterPipelineSearch — автоматический подбор гиперпараметров
-пайплайна PCA → UMAP → HDBSCAN / KMeans.
-
-Пример использования
---------------------
-    from clustering.pipeline_search import pca_analysis, ClusterPipelineSearch
-
-    pca_res = pca_analysis(X_scaled)
-
-    searcher = ClusterPipelineSearch(
-        n_pca_values          = [pca_res["k80"], pca_res["k90"]],
-        n_neighbors_values    = [10, 20, 30, 50],
-        min_dist_values       = [0.0, 0.1],
-        n_components_umap_values = [5, 10, 15],
-        min_cluster_size_values  = [50, 100, 200, 500],   # HDBSCAN
-        n_clusters_values        = [3, 4, 5, 6, 8],       # KMeans
-        save_path="results/pipeline_search.csv",
-    )
-    searcher.run(X_scaled, y_target)
-    display(searcher.top_k(3))
-"""
 from __future__ import annotations
 
 import time
@@ -47,31 +25,18 @@ try:
     _HDBSCAN_AVAILABLE = True
 except ImportError:
     _HDBSCAN_AVAILABLE = False
-    warnings.warn("hdbscan не установлен — HDBSCAN недоступен.")
 
 try:
     import umap as _umap_pkg
     _UMAP_AVAILABLE = True
 except ImportError:
     _UMAP_AVAILABLE = False
-    warnings.warn("umap-learn не установлен.")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PCA Analysis
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _kneedle_elbow(cumvar: np.ndarray, max_k: int = 200) -> int:
-    """
-    Находит «локоть» кривой cumulative variance методом kneedle:
-    максимальное перпендикулярное расстояние от прямой (0, cumvar[0]) → (n, 1.0).
-    Ограничиваем поиск первыми max_k компонентами — иначе на плавных кривых
-    алгоритм уходит в хвост.
-    """
     n = min(len(cumvar), max_k)
     x = np.linspace(0.0, 1.0, n)
     y = (cumvar[:n] - cumvar[0]) / max(cumvar[n - 1] - cumvar[0], 1e-9)
-    # Расстояние каждой точки от прямой y=x (диагональ нормированного пространства)
     distances = np.abs(y - x)
     return int(np.argmax(distances)) + 1
 
@@ -81,31 +46,11 @@ def pca_analysis(
     random_state: int = 42,
     plot: bool = True,
 ) -> dict[str, Any]:
-    """
-    Scree-plot, cumulative variance и автоматическое нахождение локтя.
-
-    Parameters
-    ----------
-    X : np.ndarray (N, F) — нормализованные фичи
-    random_state : int
-    plot : bool — показывать ли графики
-
-    Returns
-    -------
-    dict:
-        pca      — fitted PCA (all components)
-        cumvar   — cumulative explained variance array
-        elbow_k  — колено по второй производной
-        k80, k90, k95 — минимум компонент для 80/90/95% дисперсии
-    """
     pca = PCA(random_state=random_state)
     pca.fit(X)
     ev = pca.explained_variance_ratio_
     cumvar = np.cumsum(ev)
 
-    # Локоть: метод максимального перпендикулярного расстояния от диагонали
-    # (kneedle-подход). Работает корректно на плавных монотонных кривых,
-    # в отличие от второй производной.
     elbow_k = _kneedle_elbow(cumvar)
 
     thresholds = {t: int(np.searchsorted(cumvar, t) + 1) for t in (0.80, 0.90, 0.95)}
@@ -117,12 +62,12 @@ def pca_analysis(
         axes[0].bar(range(1, n_show + 1), ev[:n_show],
                     color="steelblue", alpha=0.75, width=0.8)
         axes[0].axvline(thresholds[0.90], color="crimson", ls="--", lw=1.5,
-                        label=f"90% → {thresholds[0.90]} компонент")
+                        label=f"90% → {thresholds[0.90]} components")
         axes[0].axvline(elbow_k, color="darkorange", ls=":", lw=1.8,
                         label=f"elbow → {elbow_k}")
-        axes[0].set_title(f"Scree plot (первые {n_show} компонент)")
-        axes[0].set_xlabel("Компонента")
-        axes[0].set_ylabel("Объяснённая дисперсия")
+        axes[0].set_title(f"Scree plot (first {n_show} components)")
+        axes[0].set_xlabel("Component")
+        axes[0].set_ylabel("Explained variance")
         axes[0].legend(fontsize=9)
 
         axes[1].plot(range(1, len(cumvar) + 1), cumvar, lw=2, color="steelblue")
@@ -138,8 +83,8 @@ def pca_analysis(
             )
         axes[1].axvline(elbow_k, color="darkorange", ls=":", lw=1.8)
         axes[1].set_xlim(0, min(len(cumvar), 100))
-        axes[1].set_xlabel("Число компонент")
-        axes[1].set_ylabel("Накопленная дисперсия")
+        axes[1].set_xlabel("Number of components")
+        axes[1].set_ylabel("Cumulative variance")
         axes[1].set_title("Cumulative explained variance")
 
         plt.suptitle(
@@ -150,10 +95,10 @@ def pca_analysis(
         plt.tight_layout()
         plt.show()
 
-    print("PCA рекомендации:")
+    print("PCA recommendations:")
     print(f"  Elbow (kneedle): {elbow_k}")
     for t, k in thresholds.items():
-        print(f"  {int(t * 100)}% дисперсии → {k} компонент")
+        print(f"  {int(t * 100)}% variance → {k} components")
 
     return {
         "pca": pca,
@@ -162,43 +107,8 @@ def pca_analysis(
         **{f"k{int(t * 100)}": k for t, k in thresholds.items()},
     }
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Grid Search
-# ─────────────────────────────────────────────────────────────────────────────
-
+        
 class ClusterPipelineSearch:
-    """
-    Grid search по гиперпараметрам PCA → UMAP → HDBSCAN / KMeans.
-
-    Для каждой UMAP-группы (n_pca × n_neighbors × min_dist × n_components_umap):
-      1. Применяется PCA(n_pca)
-      2. UMAP запускается 3× (seed = 42, 0, 99) — для оценки стабильности
-      3. Для каждого clustering-конфига считаются метрики на Z_main (seed=42)
-         и stability ARI по трём наборам меток
-      4. Результаты сохраняются в DataFrame после каждой UMAP-группы
-
-    Parameters
-    ----------
-    n_pca_values : список числа компонент PCA, напр. [k80, k90]
-    n_neighbors_values : список n_neighbors для UMAP
-    min_dist_values : список min_dist для UMAP
-    n_components_umap_values : список n_components для UMAP
-    algos : список алгоритмов для поиска — любое подмножество {"hdbscan", "kmeans"}.
-            По умолчанию ["hdbscan", "kmeans"]. Передай ["hdbscan"] чтобы не гонять KMeans.
-    min_cluster_size_values : список min_cluster_size для HDBSCAN
-    n_clusters_values : список n_clusters для KMeans
-    min_n_clusters / max_n_clusters : жёсткий фильтр на число кластеров
-    max_noise_ratio : максимальная доля шума для HDBSCAN (жёсткий фильтр)
-    min_stability_ari : минимальный ARI стабильности (жёсткий фильтр)
-    min_cluster_points : минимальный размер наименьшего кластера
-    w_silhouette / w_downstream / w_stability : веса составного скора
-    sil_sample : размер подвыборки для silhouette_score
-    n_jobs : число CPU-ядер для stability UMAP (−1 = все). Основной UMAP
-             всегда детерминирован (random_state задан, n_jobs=1).
-    save_path : если задан — сохранять промежуточные результаты в CSV
-    """
-
     _STABILITY_SEEDS = [42, 0, 99]
     _VALID_ALGOS = {"hdbscan", "kmeans"}
 
@@ -212,17 +122,14 @@ class ClusterPipelineSearch:
         algos: list[str] = ("hdbscan", "kmeans"),
         min_cluster_size_values: list[int] = (50, 100, 200, 500),
         n_clusters_values: list[int] = (3, 4, 5, 6, 8),
-        # Hard filters
         min_n_clusters: int = 3,
         max_n_clusters: int = 8,
         max_noise_ratio: float = 0.20,
         min_stability_ari: float = 0.70,
         min_cluster_points: int = 300,
-        # Scoring
         w_silhouette: float = 0.4,
         w_downstream: float = 0.4,
         w_stability: float = 0.2,
-        # Performance
         sil_sample: int = 10_000,
         n_jobs: int = -1,
         save_path: Optional[str] = None,
@@ -230,7 +137,7 @@ class ClusterPipelineSearch:
     ):
         unknown = set(algos) - self._VALID_ALGOS
         if unknown:
-            raise ValueError(f"Неизвестные алгоритмы: {unknown}. Допустимы: {self._VALID_ALGOS}")
+            raise ValueError(f"Unknown algorithms: {unknown}. Valid: {self._VALID_ALGOS}")
         self.algos = list(algos)
 
         self.n_pca_values = list(n_pca_values)
@@ -257,17 +164,7 @@ class ClusterPipelineSearch:
         self.results_: Optional[pd.DataFrame] = None
         self._rows: list[dict] = []
 
-    # ── public ────────────────────────────────────────────────────────────────
-
     def run(self, X_scaled: np.ndarray, y_target: np.ndarray) -> "ClusterPipelineSearch":
-        """
-        Запустить полный перебор.
-
-        Parameters
-        ----------
-        X_scaled : (N, F) нормализованные фичи
-        y_target : (N,) целевая переменная (forward return)
-        """
         X = np.asarray(X_scaled, dtype=float)
         y = np.asarray(y_target, dtype=float)
 
@@ -301,7 +198,6 @@ class ClusterPipelineSearch:
                     n_pca=n_pca, nn=n_neighbors, md=min_dist, nu=n_umap
                 )
 
-            # ── PCA ──────────────────────────────────────────────────────────
             try:
                 pca = PCA(n_components=min(n_pca, X.shape[1] - 1),
                           random_state=self.random_state)
@@ -310,10 +206,6 @@ class ClusterPipelineSearch:
                 warnings.warn(f"PCA(n={n_pca}) failed: {exc}")
                 continue
 
-            # ── UMAP ─────────────────────────────────────────────────────────
-            # Основной fit: детерминирован (random_state задан, n_jobs=1).
-            # Stability fits: random_state=None → UMAP использует n_jobs=-1
-            #   (параллельные ядра). Это 2-4× быстрее на многоядерных CPU.
             try:
                 Z_main = self._fit_umap(
                     P, n_umap, n_neighbors, min_dist,
@@ -328,7 +220,7 @@ class ClusterPipelineSearch:
                 try:
                     Z_list.append(self._fit_umap(
                         P, n_umap, n_neighbors, min_dist,
-                        seed=None, n_jobs=self.n_jobs,   # параллельный
+                        seed=None, n_jobs=self.n_jobs,
                     ))
                 except Exception as exc:
                     warnings.warn(f"UMAP(stability) failed: {exc}")
@@ -339,7 +231,6 @@ class ClusterPipelineSearch:
                 min_dist=min_dist, n_components_umap=n_umap,
             )
 
-            # ── HDBSCAN configs ───────────────────────────────────────────────
             if run_hdbscan:
                 for mcs in self.min_cluster_size_values:
                     self._eval(
@@ -349,7 +240,6 @@ class ClusterPipelineSearch:
                         umap_key=umap_key,
                     )
 
-            # ── KMeans configs ────────────────────────────────────────────────
             if run_kmeans:
                 for k in self.n_clusters_values:
                     self._eval(
@@ -359,20 +249,16 @@ class ClusterPipelineSearch:
                         umap_key=umap_key,
                     )
 
-            # ── Checkpoint ───────────────────────────────────────────────────
             self._checkpoint()
 
         self.results_ = pd.DataFrame(self._rows) if self._rows else pd.DataFrame()
         self._add_composite_score()
         if self.save_path and len(self.results_):
             self.results_.to_csv(self.save_path, index=False)
-            print(f"\nРезультаты сохранены: {self.save_path}")
+            print(f"\nResults saved: {self.save_path}")
         return self
 
-    # ── filtering & ranking ───────────────────────────────────────────────────
-
     def filtered(self) -> pd.DataFrame:
-        """Применить жёсткие фильтры и вернуть отсортированный DataFrame."""
         df = self.results_
         if df is None or len(df) == 0:
             return pd.DataFrame()
@@ -383,22 +269,12 @@ class ClusterPipelineSearch:
             & (df["stability_ari"].fillna(0) >= self.min_stability_ari)
             & (df["min_cluster_size_actual"].fillna(0) >= self.min_cluster_points)
         )
-        # noise_ratio — только для HDBSCAN
         hdb = df["algo"] == "hdbscan"
         m = m & (~hdb | (df["noise_ratio"].fillna(1.0) <= self.max_noise_ratio))
 
         return df[m].sort_values("composite_score", ascending=False)
 
-    def top_k(self, k: int = 3, filtered: bool = True) -> pd.DataFrame:
-        """
-        Топ-k конфигураций по composite_score.
-
-        Parameters
-        ----------
-        k : int — сколько строк вернуть
-        filtered : bool — применять ли жёсткие фильтры; если нет прошедших —
-                   автоматически переключается на полный DataFrame
-        """
+    def top_k(self, k: int = 3, filtered: bool = True) -> pd.DataFrame: 
         cols = [
             "rank", "algo",
             "n_pca", "n_neighbors", "min_dist", "n_components_umap",
@@ -420,14 +296,13 @@ class ClusterPipelineSearch:
         return top[present]
 
     def summary(self) -> None:
-        """Краткая сводка по результатам поиска."""
         df = self.results_
         if df is None or len(df) == 0:
-            print("Нет результатов.")
+            print("No results.")
             return
         f = self.filtered()
-        print(f"Всего конфигураций: {len(df)}")
-        print(f"Прошли жёсткие фильтры: {len(f)}")
+        print(f"Total configurations: {len(df)}")
+        print(f"Passed hard filters: {len(f)}")
         if len(df):
             print(f"\nSilhouette — min: {df['silhouette'].min():.4f}  "
                   f"max: {df['silhouette'].max():.4f}  "
@@ -437,8 +312,6 @@ class ClusterPipelineSearch:
             print(f"Noise ratio (HDBSCAN) — "
                   f"min: {df.loc[df['algo']=='hdbscan','noise_ratio'].min():.3f}  "
                   f"max: {df.loc[df['algo']=='hdbscan','noise_ratio'].max():.3f}")
-
-    # ── private ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _fit_umap(
@@ -450,9 +323,7 @@ class ClusterPipelineSearch:
         n_jobs: int = 1,
     ) -> np.ndarray:
         if not _UMAP_AVAILABLE:
-            raise ImportError("umap-learn не установлен.")
-        # Если seed задан, UMAP принудительно ставит n_jobs=1 (детерминизм).
-        # Если seed=None — работает параллельно на n_jobs ядрах.
+            raise ImportError("umap-learn is not installed.")
         reducer = _umap_pkg.UMAP(
             n_components=n_components,
             n_neighbors=n_neighbors,
@@ -482,7 +353,7 @@ class ClusterPipelineSearch:
                 n_init=10,
             )
             return np.asarray(km.fit_predict(Z), dtype=int)
-        raise ValueError(f"Неизвестный алгоритм: {algo}")
+        raise ValueError(f"Unknown algorithm: {algo}")
 
     def _stability_ari(
         self,
@@ -490,7 +361,6 @@ class ClusterPipelineSearch:
         algo: str,
         params: dict,
     ) -> float:
-        """Средний ARI между метками, полученными из трёх UMAP-вложений."""
         label_sets: list[np.ndarray] = []
         for Z in Z_list:
             if Z is None:
@@ -508,7 +378,6 @@ class ClusterPipelineSearch:
         return float(np.mean(aris))
 
     def _downstream_rmse(self, labels: np.ndarray, y: np.ndarray) -> float:
-        """RMSE Ridge-регрессии cluster_label → y_target (one-hot features)."""
         mask = labels != -1
         if mask.sum() == 0:
             return float(np.sqrt(np.mean((y - y.mean()) ** 2)))
@@ -538,7 +407,6 @@ class ClusterPipelineSearch:
             noise_ratio = float((lbl == -1).sum() / len(lbl))
             mask = lbl != -1
 
-            # Cluster quality metrics
             sil, db = float("nan"), float("nan")
             if n_c >= 2 and mask.sum() > 100:
                 n_samp = min(self.sil_sample, int(mask.sum()))
@@ -550,10 +418,8 @@ class ClusterPipelineSearch:
                     ))
                     db = float(davies_bouldin_score(Z_main[mask], lbl[mask]))
 
-            # Stability
             stab = self._stability_ari(Z_list, algo, algo_params)
 
-            # Min cluster size (excluding noise)
             valid_labels = lbl[mask]
             if len(valid_labels):
                 _, cnts = np.unique(valid_labels, return_counts=True)
@@ -561,7 +427,6 @@ class ClusterPipelineSearch:
             else:
                 min_c_size = 0
 
-            # Downstream
             ds_rmse = self._downstream_rmse(lbl, y)
             ds_impr = max(0.0, (baseline_rmse - ds_rmse) / (baseline_rmse + 1e-9))
 
@@ -587,15 +452,12 @@ class ClusterPipelineSearch:
         if df is None or len(df) == 0:
             return
 
-        # Silhouette [-1, 1] → [0, 1]
         sil_norm = ((df["silhouette"].fillna(-1) + 1) / 2).clip(0, 1)
 
-        # Downstream improvement → [0, 1]
         ds = df["downstream_improvement"].fillna(0).clip(0)
         ds_max = ds.max()
         ds_norm = (ds / ds_max).clip(0, 1) if ds_max > 0 else ds
 
-        # Stability ARI is already [0, 1]
         stab = df["stability_ari"].fillna(0).clip(0, 1)
 
         df["composite_score"] = (

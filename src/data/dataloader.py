@@ -11,15 +11,13 @@ import pandas as pd
 
 try:
     from dotenv import load_dotenv as _load_dotenv
-except ImportError:  # pragma: no cover
+except ImportError:
 
     def _load_dotenv(*_a, **_k):
         pass
 
 warnings.filterwarnings("ignore")
 
-
-# ── split boundaries (календарь, как раньше) ───────────────────────────────────
 
 @dataclass(frozen=True)
 class SplitBounds:
@@ -46,7 +44,6 @@ TEST_END = DEFAULT_SPLIT.test_end
 
 
 def _project_root() -> Path:
-    # dataloader.py → data/ → src/ → CourseBDAMI3/
     return Path(__file__).resolve().parents[2]
 
 
@@ -56,17 +53,6 @@ def _default_candles_root() -> Path:
 
 
 class Dataloader:
-    """
-    Загрузка parquet-свечей, индикаторы, календарный train/val/test,
-    нарезка окон с per-window нормализацией и таргетом log-return.
-
-    Пример::
-
-        loader = Dataloader()
-        ds = loader.cut_on_windows(["SBER", "GAZP"])
-        X_train, y_train, X_val, y_val, X_test, y_test = loader.concat_splits(ds)
-    """
-
     def __init__(
         self,
         data_root: Path | str | None = None,
@@ -77,7 +63,6 @@ class Dataloader:
         self.split = split or DEFAULT_SPLIT
         self.eps = eps
 
-    # ── load / features / split ─────────────────────────────────────────────
 
     def load_df(
         self,
@@ -142,7 +127,6 @@ class Dataloader:
         test = df.loc[df.index >= s.test_start]
         return train, val, test
 
-    # ── windows ───────────────────────────────────────────────────────────────
 
     def make_windows(
         self,
@@ -152,11 +136,6 @@ class Dataloader:
         horizon: int = 1,
         feature_cols: list[str] | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Returns:
-            X : (N, seq_len, n_features)
-            y : (N,)  — log-return close_{t+horizon} / close_t
-        """
         if feature_cols is None:
             feature_cols = [c for c in df.columns]
         step = step_size or seq_len
@@ -200,10 +179,6 @@ class Dataloader:
         feature_cols: list[str] | None = None,
         add_indicators: bool = True,
     ) -> dict[str, dict[str, tuple[np.ndarray, np.ndarray]]]:
-        """
-        Returns:
-            dataset[ticker]["train|val|test"] = (X, y), X: (N, seq_len, F)
-        """
         result: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
         for ticker in tickers:
             df = self.load_df(ticker, interval, path)
@@ -240,7 +215,6 @@ class Dataloader:
     def concat_splits(
         dataset: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]],
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Склеить все тикеры в один пул по train/val/test."""
         X_train = np.concatenate([dataset[t]["train"][0] for t in dataset])
         y_train = np.concatenate([dataset[t]["train"][1] for t in dataset])
         X_val = np.concatenate([dataset[t]["val"][0] for t in dataset])
@@ -254,7 +228,6 @@ class Dataloader:
         dataset: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]],
         ticker: str,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Один тикер: train/val/test массивы."""
         X_train = dataset[ticker]["train"][0]
         y_train = dataset[ticker]["train"][1]
         X_val = dataset[ticker]["val"][0]

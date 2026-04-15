@@ -5,7 +5,6 @@ import torch
 
 
 class CNNModel(TorchBaseModel):
-    """1-D CNN regression model for windowed time-series."""
 
     def __init__(
         self,
@@ -44,7 +43,6 @@ class CNNModel(TorchBaseModel):
         self.to(self._resolve_device(device))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """x: (batch, seq_len, input_size) → (batch,)"""
         x = x.permute(0, 2, 1)               
         x = self.conv_blocks(x)               
         x = self.pool(x).squeeze(-1)          
