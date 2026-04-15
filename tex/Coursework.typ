@@ -66,8 +66,7 @@
 #show cite: set text(fill: blue)
 
 // Титульный лист
-#include "title_kr.typ"
-#pagebreak()
+
 
 // Начинаем нумерацию со страницы 2
 #counter(page).update(2)
