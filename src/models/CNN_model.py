@@ -45,7 +45,7 @@ class CNNModel(TorchBaseModel):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """x: (batch, seq_len, input_size) → (batch,)"""
-        x = x.permute(0, 2, 1)               # (batch, features, seq_len)
-        x = self.conv_blocks(x)               # (batch, num_filters, seq_len)
-        x = self.pool(x).squeeze(-1)          # (batch, num_filters)
-        return self.fc(x).squeeze(-1)         # (batch,)
+        x = x.permute(0, 2, 1)               
+        x = self.conv_blocks(x)               
+        x = self.pool(x).squeeze(-1)          
+        return self.fc(x).squeeze(-1)         

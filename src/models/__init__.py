@@ -5,6 +5,7 @@ from .CNN_model import CNNModel
 from .Transformer_model import TransformerModel
 from .LightGBM_model import LightGBMModel
 from .Arima_model import ArimaModel
+from .MarkovSwitchingAR_model import MarkovSwitchingARModel
 
 __all__ = [
     "BaseModel",
@@ -15,4 +16,5 @@ __all__ = [
     "TransformerModel",
     "LightGBMModel",
     "ArimaModel",
+    "MarkovSwitchingARModel",
 ]

@@ -22,9 +22,6 @@ import torch
 import torch.utils.data
 from torch import nn
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Abstract base — every model (torch and non-torch) implements this
-# ──────────────────────────────────────────────────────────────────────────────
 
 class BaseModel(ABC):
     """Minimal abstract interface shared by all regression models."""

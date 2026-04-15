@@ -46,7 +46,6 @@ def _save(model, path: Path) -> str:
     return str(path)
 
 
-# ── LSTM ───────────────────────────────────────────────────────────────────────
 
 def run_optuna_lstm(
     X_train: np.ndarray, y_train: np.ndarray,
@@ -82,7 +81,6 @@ def run_optuna_lstm(
     return best, study, _save(best, Path(save_dir) / "lstm_best.pth")
 
 
-# ── GRU ───────────────────────────────────────────────────────────────────────
 
 def run_optuna_gru(
     X_train: np.ndarray, y_train: np.ndarray,
@@ -118,7 +116,6 @@ def run_optuna_gru(
     return best, study, _save(best, Path(save_dir) / "gru_best.pth")
 
 
-# ── CNN ───────────────────────────────────────────────────────────────────────
 
 def run_optuna_cnn(
     X_train: np.ndarray, y_train: np.ndarray,
@@ -155,7 +152,6 @@ def run_optuna_cnn(
     return best, study, _save(best, Path(save_dir) / "cnn_best.pth")
 
 
-# ── Transformer ───────────────────────────────────────────────────────────────
 
 def run_optuna_transformer(
     X_train: np.ndarray, y_train: np.ndarray,
@@ -196,7 +192,6 @@ def run_optuna_transformer(
     return best, study, _save(best, Path(save_dir) / "transformer_best.pth")
 
 
-# ── LightGBM ─────────────────────────────────────────────────────────────────
 
 def run_optuna_lightgbm(
     X_train: np.ndarray, y_train: np.ndarray,
@@ -230,7 +225,6 @@ def run_optuna_lightgbm(
     return best, study, _save(best, Path(save_dir) / "lightgbm_best.pkl")
 
 
-# ── ARIMA ─────────────────────────────────────────────────────────────────────
 
 def run_optuna_arima(
     X_train: np.ndarray, y_train: np.ndarray,
