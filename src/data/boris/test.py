@@ -13,9 +13,8 @@ eq = Market('EQ')
 data = eq.obstats(date='2024-10-15')
 
 
-# Теперь data - это DataFrame со всеми методами pandas
-print(type(data))  # <class 'pandas.DataFrame'>
-print(data.head())  # Первые 5 строк
-print(data.shape)   # Размерность (строки, колонки)
+print(type(data))
+print(data.head())
+print(data.shape)
 
 data.to_csv('obstats_2024-10-15.csv', index=False)
