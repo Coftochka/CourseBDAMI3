@@ -13,8 +13,11 @@ The main code is located in `src`.
 - `src/loaded_models` - saved weights:
   - `full_data_models` - main best-model checkpoints;
   - `ts2vec` - TS2Vec weights and configs (`daily`/`hourly`);
-  - `ts2vec_models` - model weights for each cluster produced by TS2Vec + KMeans;
-  - `handmade_models` - model weights for each cluster produced by handmade features + KMeans.
+  - `ts2vec_models` - per-cluster model weights produced by TS2Vec + KMeans (`cluster0` ... `cluster4`, each cluster has 5 model files);
+  - `handmade_models` - per-cluster model weights produced by handmade features + KMeans (`cluster0` ... `cluster3`, each cluster has 5 model files);
+  - `cludter` - serialized pretrained KMeans artifacts for embedding spaces:
+    - `kmeans_ts2vec.pkl`
+    - `kmeans_handmade.pkl`
 - `moex_filled` - prepared data (if already downloaded/filled).
 - `experiments` - experimental work and intermediate results.
 
@@ -36,5 +39,5 @@ The main code is located in `src`.
 
 ## Notes
 
-- The project includes both full checkpoints (`full_data_models`) and lighter cluster-specific files in `ts2vec_models` and `handmade_models`.
+- The project includes full checkpoints (`full_data_models`), cluster-specific model files (`ts2vec_models`, `handmade_models`), and serialized clusterers in `cludter`.
 - If weights fail to load, verify filename and model architecture compatibility.
